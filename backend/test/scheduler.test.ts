@@ -115,6 +115,21 @@ describe('sending', { timeout: 60000 }, () => {
   });
 });
 
+describe('infrastructure errors', { timeout: 60000 }, () => {
+  it('marks an email failed when a job exhausts its retries before reaching SMTP', async () => {
+    const sender = await createSender(owner.user.id, smtp.port);
+    await prisma.scheduledEmail.create({
+      data: { senderId: sender.id, toEmail: 'stuck@example.com', subject: 's', body: '<p>s</p>', scheduledAt: new Date(), delayMs: 0 },
+    });
+    startedWorker();
+
+    await waitFor(async () => (await statusOf('stuck@example.com')) === 'failed', 30000);
+    const row = await prisma.scheduledEmail.findFirstOrThrow();
+    assert.ok(row.failReason);
+    assert.equal(smtp.received.length, 0);
+  });
+});
+
 describe('restart safety', { timeout: 60000 }, () => {
   it('sends jobs scheduled while no worker was running', async () => {
     const sender = await createSender(owner.user.id, smtp.port);

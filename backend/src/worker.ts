@@ -89,8 +89,20 @@ const worker = new Worker<EmailJobData>(
   { connection: redis, concurrency: env.WORKER_CONCURRENCY },
 );
 
+async function failExhaustedEmail(emailId: string, reason: string): Promise<void> {
+  const { count } = await prisma.scheduledEmail.updateMany({
+    where: { id: emailId, status: 'scheduled' },
+    data: { status: 'failed', failReason: reason },
+  });
+  if (count === 0) return;
+  const failed = await prisma.scheduledEmail.findUniqueOrThrow({ where: { id: emailId } });
+  await indexEmail(failed).catch((e) => console.error('ES index failed:', e.message));
+}
+
 worker.on('failed', (job, err) => {
   console.error(`job ${job?.id} failed:`, err.message);
+  if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+  failExhaustedEmail(job.data.emailId, err.message).catch((e) => console.error('marking email failed errored:', e.message));
 });
 
 // A stalled job that was mid-send may or may not have gone out; fail it rather than risk a duplicate.
