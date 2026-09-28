@@ -8,6 +8,25 @@ import { tryClaimSendSlot } from './send-pacing';
 import { transporterFor } from './mailer';
 import { indexEmail } from './es';
 import { notifyRateLimitHit } from './services/slack-notify.service';
+import { requeueScheduledEmails } from './services/requeue-scheduled.service';
+
+const RECORD_ATTEMPTS = 3;
+
+// The mail is already out, so a DB failure here must never reset the row or retry the job.
+async function recordSent(emailId: string): Promise<void> {
+  for (let attempt = 1; attempt <= RECORD_ATTEMPTS; attempt++) {
+    try {
+      const sent = await prisma.scheduledEmail.update({
+        where: { id: emailId },
+        data: { status: 'sent', sentAt: new Date() },
+      });
+      await indexEmail(sent).catch((err) => console.error('ES index failed:', err.message));
+      return;
+    } catch (err) {
+      console.error(`recording sent email ${emailId} failed (attempt ${attempt}):`, (err as Error).message);
+    }
+  }
+}
 
 const worker = new Worker<EmailJobData>(
   QUEUE_NAME,
@@ -47,19 +66,12 @@ const worker = new Worker<EmailJobData>(
     if (locked.count === 0) return; // another worker/attempt already took it
 
     try {
-      const transporter = transporterFor(email.sender);
-      await transporter.sendMail({
+      await transporterFor(email.sender).sendMail({
         from: email.sender.smtpUser,
         to: email.toEmail,
         subject: email.subject,
         html: email.body,
       });
-
-      const sent = await prisma.scheduledEmail.update({
-        where: { id: email.id },
-        data: { status: 'sent', sentAt: new Date() },
-      });
-      await indexEmail(sent).catch((err) => console.error('ES index failed:', err.message));
     } catch (err) {
       const attemptsExhausted = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       const failed = await prisma.scheduledEmail.update({
@@ -71,6 +83,8 @@ const worker = new Worker<EmailJobData>(
       await indexEmail(failed).catch((e) => console.error('ES index failed:', e.message));
       throw err;
     }
+
+    await recordSent(email.id);
   },
   { connection: redis, concurrency: env.WORKER_CONCURRENCY },
 );
@@ -98,4 +112,6 @@ async function shutdown() {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-console.log('Courier worker started');
+requeueScheduledEmails()
+  .then((count) => console.log(`Courier worker started, re-enqueued ${count} scheduled emails`))
+  .catch((err) => console.error('requeue on boot failed:', err.message));

@@ -16,6 +16,7 @@ import { ensureIndex } from './es';
 import { apiLimiter } from './middleware/rate-limit';
 import { prisma } from './prisma';
 import { redis } from './redis';
+import { requeueScheduledEmails } from './services/requeue-scheduled.service';
 
 const app = express();
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
@@ -52,6 +53,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
 app.use(errorHandler);
 
 ensureIndex().catch((err) => console.error('failed to ensure ES index:', err.message));
+requeueScheduledEmails().catch((err) => console.error('requeue on boot failed:', err.message));
 
 const server = app.listen(env.PORT, () => {
   console.log(`Courier API listening on :${env.PORT}`);
