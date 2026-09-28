@@ -26,7 +26,8 @@ sendersRouter.post('/', async (req, res) => {
       hourlyLimit: parsed.data.hourlyLimit ?? env.DEFAULT_SENDER_HOURLY_LIMIT,
     },
   });
-  res.status(201).json({ ...sender, smtpPass: undefined });
+  const { smtpPass, ...safeSender } = sender;
+  res.status(201).json(safeSender);
 });
 
 sendersRouter.get('/', async (_req, res) => {
