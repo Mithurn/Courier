@@ -30,3 +30,10 @@ export async function tryConsumeHourlySlot(
   }
   return { allowed: true, retryAfterMs: 0 };
 }
+
+// One Slack alert per sender per hour, not one per job that hits the cap.
+export async function claimRateLimitAlert(senderId: string): Promise<boolean> {
+  const key = `rl-alert:${hourWindowKey(senderId, new Date())}`;
+  const claimed = await redis.set(key, '1', 'EX', 3700, 'NX');
+  return claimed === 'OK';
+}

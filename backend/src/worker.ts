@@ -3,10 +3,11 @@ import { redis } from './redis';
 import { env } from './env';
 import { prisma } from './prisma';
 import { QUEUE_NAME, EmailJobData } from './queues/email-queue';
-import { tryConsumeHourlySlot } from './rate-limit';
+import { tryConsumeHourlySlot, claimRateLimitAlert } from './rate-limit';
 import { tryClaimSendSlot } from './send-pacing';
 import { transporterFor } from './mailer';
 import { indexEmail } from './es';
+import { notifyRateLimitHit } from './services/slack-notify.service';
 
 const worker = new Worker<EmailJobData>(
   QUEUE_NAME,
@@ -19,8 +20,7 @@ const worker = new Worker<EmailJobData>(
 
     if (email.status !== 'scheduled') return; // already handled, idempotent no-op
 
-    // Pacing gates first and atomically claims the slot, so a job that only
-    // gets pacing-delayed never touches (and never inflates) the hourly counter.
+    // Pacing before rate limit, so a paced retry never inflates the hourly count.
     const paceDelay = await tryClaimSendSlot(email.senderId, email.delayMs);
     if (paceDelay > 0) {
       await job.moveToDelayed(Date.now() + paceDelay, token);
@@ -32,6 +32,12 @@ const worker = new Worker<EmailJobData>(
       email.sender.hourlyLimit,
     );
     if (!allowed) {
+      if (await claimRateLimitAlert(email.senderId)) {
+        await notifyRateLimitHit(
+          email.sender.ownerId,
+          `:warning: *${email.sender.name}* hit its hourly limit (${email.sender.hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
+        );
+      }
       await job.moveToDelayed(Date.now() + retryAfterMs, token);
       throw new DelayedError();
     }
