@@ -15,16 +15,31 @@ enum EmailStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  googleId  String   @unique
-  email     String   @unique
-  name      String
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  id               String            @id @default(cuid())
+  googleId         String            @unique
+  email            String            @unique
+  name             String
+  avatarUrl        String?
+  createdAt        DateTime          @default(now())
+  senders          Sender[]
+  slackIntegration SlackIntegration?
+}
+
+model SlackIntegration {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id])
+  incomingWebhookUrl     String   @db.Text
+  incomingWebhookChannel String
+  teamId                 String
+  teamName               String
+  createdAt              DateTime @default(now())
 }
 
 model Sender {
   id            String         @id @default(cuid())
+  ownerId       String
+  owner         User           @relation(fields: [ownerId], references: [id])
   name          String
   smtpHost      String
   smtpPort      Int
@@ -33,6 +48,8 @@ model Sender {
   hourlyLimit   Int
   createdAt     DateTime       @default(now())
   emails        ScheduledEmail[]
+
+  @@index([ownerId])
 }
 
 model ScheduledEmail {
