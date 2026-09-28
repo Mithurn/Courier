@@ -20,6 +20,7 @@ const schema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_CALLBACK_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
 
   SLACK_CLIENT_ID: z.string().min(1),

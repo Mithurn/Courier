@@ -15,10 +15,11 @@ import { requireAuth } from './auth/middleware';
 import { ensureIndex } from './es';
 import { apiLimiter } from './middleware/rate-limit';
 import { prisma } from './prisma';
+import { redis } from './redis';
 
 const app = express();
-app.set('trust proxy', 1);
-app.use(helmet());
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
+app.use(helmet({ contentSecurityPolicy: { directives: { 'upgrade-insecure-requests': null } } }));
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -57,8 +58,9 @@ const server = app.listen(env.PORT, () => {
 });
 
 async function shutdown() {
-  server.close();
+  await new Promise((resolve) => server.close(resolve));
   await Promise.allSettled([emailQueue.close(), prisma.$disconnect()]);
+  await redis.quit().catch(() => undefined);
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);

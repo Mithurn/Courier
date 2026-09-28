@@ -12,6 +12,14 @@ export function msUntilNextHour(date: Date): number {
   return HOUR_MS - (date.getTime() % HOUR_MS);
 }
 
+// SET NX + INCRBY in one MULTI works on any Redis version and never leaves a counter without a TTL.
+export async function incrWithinWindow(key: string, by: number, ttlSeconds: number): Promise<number> {
+  const results = await redis.multi().set(key, 0, 'EX', ttlSeconds, 'NX').incrby(key, by).exec();
+  const count = Number(results?.[1]?.[1]);
+  if (!Number.isFinite(count)) throw new Error('Redis counter returned no value');
+  return count;
+}
+
 // Atomically increments the sender's count for this hour; true if still within limit.
 export async function tryConsumeHourlySlot(
   senderId: string,
@@ -20,8 +28,7 @@ export async function tryConsumeHourlySlot(
   const now = new Date();
   const key = hourWindowKey(senderId, now);
 
-  const results = await redis.multi().incr(key).expire(key, 3700, 'NX').exec();
-  const count = Number(results?.[0]?.[1]);
+  const count = await incrWithinWindow(key, 1, 3700);
 
   if (count > hourlyLimit) {
     return { allowed: false, retryAfterMs: msUntilNextHour(now) };

@@ -94,6 +94,7 @@ worker.on('stalled', (jobId) => {
 async function shutdown() {
   await worker.close();
   await prisma.$disconnect();
+  await redis.quit().catch(() => undefined);
   process.exit(0);
 }
 process.on('SIGTERM', shutdown);
