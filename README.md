@@ -72,7 +72,7 @@ Minimum 2 seconds per sender (`MIN_DELAY_BETWEEN_SENDS_MS`). A request can ask f
 
 - Counter key: `rl:<senderId>:<YYYYMMDDHH>` in UTC. `SET NX EX` and `INCR` run in one Redis transaction, so the counter always has a TTL and works across workers and instances.
 - The limit is `MAX_EMAILS_PER_HOUR_PER_SENDER` by default. A request can lower it for its own batch, never raise it above the sender's cap.
-- When the counter passes the limit the job is moved to the next UTC hour boundary with `moveToDelayed`. It is never dropped and never marked failed. Deferred jobs land on the same boundary and keep their relative order.
+- When the counter passes the limit the job is moved to the next UTC hour boundary with `moveToDelayed`. It is never dropped and never marked failed. Deferred jobs land on the boundary plus 1 ms per second of their original due time, so they keep their relative order (best effort, as the brief allows).
 - Trade-off: a fixed window allows a burst at the boundary (a full quota at 10:59 and again at 11:00). A sliding window is smoother but has no clean "next window" to reschedule into.
 
 ### Behaviour under load
@@ -116,9 +116,20 @@ All routes except `/health` and `/auth/*` need the session cookie. Every query i
 - Per-user daily quota, 5000 recipients per request, 1 MB request body limit.
 - Senders can only be Ethereal accounts, so there is no user-supplied SMTP host.
 
+## Tests, CI and Docker
+
+```bash
+cd backend
+npm test          # migrates a courier_test database, then runs 25 tests
+npm run typecheck # src and tests
+```
+
+The tests run against real MySQL, Redis and Elasticsearch (from `docker compose up -d`), a fake local SMTP server and a fake Slack webhook. They cover access control and tenant isolation, validation, batch scheduling, quota and idempotency, exactly-once sending, retries, failure handling, worker restarts, lost-job recovery, the hourly limit with in-order deferral, and the Slack alert.
+
+GitHub Actions (`.github/workflows/backend-ci.yml`) runs typecheck, build, a production dependency audit and the tests against service containers. On `main` it also builds `backend/Dockerfile` and pushes it to GHCR. The same image runs the API (`node dist/server.js`) and the worker (`node dist/worker.js`). Run `npx prisma migrate deploy` against the target database before starting a new version.
+
 ## Assumptions and trade-offs
 
 - The body is stored once per recipient row. A separate campaign table would save space but needs more schema.
-- The API has no tests yet. CI typechecks and builds.
 - Cookies are `SameSite=Lax`, so the frontend and API must share a site in production (for example the frontend proxying `/api`).
 - Existing Elasticsearch indices created before the explicit mapping must be deleted and recreated.
