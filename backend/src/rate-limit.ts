@@ -12,6 +12,12 @@ export function msUntilNextHour(date: Date): number {
   return HOUR_MS - (date.getTime() % HOUR_MS);
 }
 
+// Deferred jobs land 1ms apart per second of their original due time, so they keep their order at the next boundary.
+export function orderOffsetMs(now: Date, dueAt: Date): number {
+  const windowStart = now.getTime() - (now.getTime() % HOUR_MS);
+  return Math.min(Math.max(Math.floor((dueAt.getTime() - windowStart) / 1000), 0), 3599);
+}
+
 // SET NX + INCRBY in one MULTI works on any Redis version and never leaves a counter without a TTL.
 export async function incrWithinWindow(key: string, by: number, ttlSeconds: number): Promise<number> {
   const results = await redis.multi().set(key, 0, 'EX', ttlSeconds, 'NX').incrby(key, by).exec();
@@ -24,16 +30,17 @@ export async function incrWithinWindow(key: string, by: number, ttlSeconds: numb
 export async function tryConsumeHourlySlot(
   senderId: string,
   hourlyLimit: number,
-): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  dueAt: Date,
+): Promise<{ allowed: boolean; retryAt: number }> {
   const now = new Date();
   const key = hourWindowKey(senderId, now);
 
   const count = await incrWithinWindow(key, 1, 3700);
 
   if (count > hourlyLimit) {
-    return { allowed: false, retryAfterMs: msUntilNextHour(now) };
+    return { allowed: false, retryAt: now.getTime() + msUntilNextHour(now) + orderOffsetMs(now, dueAt) };
   }
-  return { allowed: true, retryAfterMs: 0 };
+  return { allowed: true, retryAt: 0 };
 }
 
 // One Slack alert per sender per hour, not one per job that hits the cap.
@@ -41,4 +48,22 @@ export async function claimRateLimitAlert(senderId: string): Promise<boolean> {
   const key = `rl-alert:${hourWindowKey(senderId, new Date())}`;
   const claimed = await redis.set(key, '1', 'EX', 3700, 'NX');
   return claimed === 'OK';
+}
+
+function dailyQuotaKey(userId: string): string {
+  return `quota:${userId}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+// Reserves `count` sends against the user's UTC-day quota; false (and nothing reserved) if it would exceed it.
+export async function tryReserveDailyQuota(userId: string, count: number, limit: number): Promise<boolean> {
+  const key = dailyQuotaKey(userId);
+  if (!((await incrWithinWindow(key, count, 90_000)) <= limit)) {
+    await redis.decrby(key, count);
+    return false;
+  }
+  return true;
+}
+
+export async function releaseDailyQuota(userId: string, count: number): Promise<void> {
+  await redis.decrby(dailyQuotaKey(userId), count);
 }

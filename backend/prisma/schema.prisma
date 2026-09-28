@@ -61,6 +61,7 @@ model ScheduledEmail {
   body          String       @db.Text
   scheduledAt   DateTime
   delayMs       Int
+  hourlyLimit   Int?
   status        EmailStatus  @default(scheduled)
   failReason    String?
   sentAt        DateTime?
