@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pull the latest images, run migrations, restart. Set GHCR_USER and GHCR_TOKEN (read:packages) for a private package.
+# Build the images from ../backend when it exists (no registry needed), otherwise pull from GHCR.
+# Then run migrations and restart. Set GHCR_USER and GHCR_TOKEN (read:packages) to pull a private package.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -12,7 +13,13 @@ if [ -n "${GHCR_TOKEN:-}" ]; then
 fi
 
 COMPOSE="docker compose -f docker-compose.prod.yml"
-$COMPOSE pull
+if [ -d ../backend ]; then
+  docker build -t courier-backend:local ../backend
+  docker build --target migrate -t courier-backend-migrate:local ../backend
+  export API_IMAGE=courier-backend:local MIGRATE_IMAGE=courier-backend-migrate:local
+else
+  $COMPOSE pull
+fi
 $COMPOSE up -d mysql redis elasticsearch
 $COMPOSE run --rm migrate
 $COMPOSE up -d
