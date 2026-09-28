@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { env } from '../env';
 import { prisma } from '../prisma';
 import { googleAuthorizeUrl, exchangeCodeForProfile } from './google';
+import { slackAuthorizeUrl, exchangeCodeForSlackInstall } from './slack';
 import { signSession, SESSION_COOKIE } from './session';
 import { requireAuth } from './middleware';
 
@@ -56,5 +57,44 @@ authRouter.get('/me', requireAuth, async (req, res) => {
 
 authRouter.post('/logout', (_req, res) => {
   res.clearCookie(SESSION_COOKIE, cookieOpts);
+  res.json({ ok: true });
+});
+
+authRouter.get('/slack', requireAuth, (_req, res) => {
+  const state = randomBytes(16).toString('hex');
+  res.cookie(STATE_COOKIE, state, { ...cookieOpts, maxAge: 5 * 60 * 1000 });
+  res.redirect(slackAuthorizeUrl(state));
+});
+
+authRouter.get('/slack/callback', requireAuth, async (req, res) => {
+  const { code, state } = req.query;
+  const expectedState = req.cookies?.[STATE_COOKIE];
+  res.clearCookie(STATE_COOKIE, cookieOpts);
+
+  if (!code || typeof code !== 'string' || !state || state !== expectedState) {
+    return res.redirect(`${env.FRONTEND_URL}/dashboard?slack=error`);
+  }
+
+  try {
+    const install = await exchangeCodeForSlackInstall(code);
+    await prisma.slackIntegration.upsert({
+      where: { userId: req.userId! },
+      update: install,
+      create: { userId: req.userId!, ...install },
+    });
+    res.redirect(`${env.FRONTEND_URL}/dashboard?slack=connected`);
+  } catch (err) {
+    console.error('Slack install failed:', err);
+    res.redirect(`${env.FRONTEND_URL}/dashboard?slack=error`);
+  }
+});
+
+authRouter.get('/slack/status', requireAuth, async (req, res) => {
+  const integration = await prisma.slackIntegration.findUnique({ where: { userId: req.userId } });
+  res.json({ connected: !!integration, teamName: integration?.teamName ?? null });
+});
+
+authRouter.post('/slack/disconnect', requireAuth, async (req, res) => {
+  await prisma.slackIntegration.deleteMany({ where: { userId: req.userId } });
   res.json({ ok: true });
 });
