@@ -81,9 +81,23 @@ worker.on('failed', (job, err) => {
   console.error(`job ${job?.id} failed:`, err.message);
 });
 
-process.on('SIGTERM', async () => {
-  await worker.close();
-  process.exit(0);
+// A stalled job that was mid-send may or may not have gone out; fail it rather than risk a duplicate.
+worker.on('stalled', (jobId) => {
+  prisma.scheduledEmail
+    .updateMany({
+      where: { id: jobId, status: 'sending' },
+      data: { status: 'failed', failReason: 'Worker interrupted during send' },
+    })
+    .catch((err) => console.error('stalled handler failed:', err.message));
 });
+
+async function shutdown() {
+  await worker.close();
+  await prisma.$disconnect();
+  await redis.quit().catch(() => undefined);
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 console.log('Courier worker started');

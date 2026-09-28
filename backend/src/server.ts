@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
@@ -12,10 +13,15 @@ import { sendersRouter } from './routes/senders';
 import { authRouter } from './auth/routes';
 import { requireAuth } from './auth/middleware';
 import { ensureIndex } from './es';
+import { apiLimiter } from './middleware/rate-limit';
+import { prisma } from './prisma';
+import { redis } from './redis';
 
 const app = express();
+app.set('trust proxy', env.TRUST_PROXY_HOPS);
+app.use(helmet({ contentSecurityPolicy: { directives: { 'upgrade-insecure-requests': null } } }));
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 app.get('/health', (_req, res) => {
@@ -23,8 +29,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/auth', authRouter);
-app.use('/emails', requireAuth, emailsRouter);
-app.use('/senders', requireAuth, sendersRouter);
+app.use('/emails', requireAuth, apiLimiter, emailsRouter);
+app.use('/senders', requireAuth, apiLimiter, sendersRouter);
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath(env.BULLBOARD_PATH);
@@ -47,6 +53,15 @@ app.use(errorHandler);
 
 ensureIndex().catch((err) => console.error('failed to ensure ES index:', err.message));
 
-app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, () => {
   console.log(`Courier API listening on :${env.PORT}`);
 });
+
+async function shutdown() {
+  await new Promise((resolve) => server.close(resolve));
+  await Promise.allSettled([emailQueue.close(), prisma.$disconnect()]);
+  await redis.quit().catch(() => undefined);
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

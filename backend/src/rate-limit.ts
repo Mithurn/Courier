@@ -5,11 +5,19 @@ function hourWindowKey(senderId: string, date: Date): string {
   return `rl:${senderId}:${stamp}`;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+// Window keys are UTC hours, so the boundary must be too (local-time math breaks in half-hour zones like IST).
 export function msUntilNextHour(date: Date): number {
-  const next = new Date(date);
-  next.setMinutes(0, 0, 0);
-  next.setHours(next.getHours() + 1);
-  return next.getTime() - date.getTime();
+  return HOUR_MS - (date.getTime() % HOUR_MS);
+}
+
+// SET NX + INCRBY in one MULTI works on any Redis version and never leaves a counter without a TTL.
+export async function incrWithinWindow(key: string, by: number, ttlSeconds: number): Promise<number> {
+  const results = await redis.multi().set(key, 0, 'EX', ttlSeconds, 'NX').incrby(key, by).exec();
+  const count = Number(results?.[1]?.[1]);
+  if (!Number.isFinite(count)) throw new Error('Redis counter returned no value');
+  return count;
 }
 
 // Atomically increments the sender's count for this hour; true if still within limit.
@@ -20,10 +28,7 @@ export async function tryConsumeHourlySlot(
   const now = new Date();
   const key = hourWindowKey(senderId, now);
 
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3700);
-  }
+  const count = await incrWithinWindow(key, 1, 3700);
 
   if (count > hourlyLimit) {
     return { allowed: false, retryAfterMs: msUntilNextHour(now) };

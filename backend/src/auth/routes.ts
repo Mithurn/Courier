@@ -6,6 +6,7 @@ import { googleAuthorizeUrl, exchangeCodeForProfile } from './google';
 import { slackAuthorizeUrl, exchangeCodeForSlackInstall } from './slack';
 import { signSession, SESSION_COOKIE } from './session';
 import { requireAuth } from './middleware';
+import { oauthLimiter } from '../middleware/rate-limit';
 
 export const authRouter = Router();
 
@@ -13,13 +14,13 @@ const STATE_COOKIE = 'oauth_state';
 // Lax requires the frontend and API to be same-site (e.g. frontend proxies /api to the backend).
 const cookieOpts = { httpOnly: true, sameSite: 'lax' as const, secure: env.GOOGLE_CALLBACK_URL.startsWith('https') };
 
-authRouter.get('/google', (_req, res) => {
+authRouter.get('/google', oauthLimiter, (_req, res) => {
   const state = randomBytes(16).toString('hex');
   res.cookie(STATE_COOKIE, state, { ...cookieOpts, maxAge: 5 * 60 * 1000 });
   res.redirect(googleAuthorizeUrl(state));
 });
 
-authRouter.get('/google/callback', async (req, res) => {
+authRouter.get('/google/callback', oauthLimiter, async (req, res) => {
   const { code, state } = req.query;
   const expectedState = req.cookies?.[STATE_COOKIE];
   res.clearCookie(STATE_COOKIE, cookieOpts);
@@ -60,13 +61,13 @@ authRouter.post('/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-authRouter.get('/slack', requireAuth, (_req, res) => {
+authRouter.get('/slack', oauthLimiter, requireAuth, (_req, res) => {
   const state = randomBytes(16).toString('hex');
   res.cookie(STATE_COOKIE, state, { ...cookieOpts, maxAge: 5 * 60 * 1000 });
   res.redirect(slackAuthorizeUrl(state));
 });
 
-authRouter.get('/slack/callback', requireAuth, async (req, res) => {
+authRouter.get('/slack/callback', oauthLimiter, requireAuth, async (req, res) => {
   const { code, state } = req.query;
   const expectedState = req.cookies?.[STATE_COOKIE];
   res.clearCookie(STATE_COOKIE, cookieOpts);
