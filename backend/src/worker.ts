@@ -4,7 +4,7 @@ import { env } from './env';
 import { prisma } from './prisma';
 import { QUEUE_NAME, EmailJobData } from './queues/email-queue';
 import { tryConsumeHourlySlot } from './rate-limit';
-import { msUntilNextAllowedSend, markSent } from './send-pacing';
+import { tryClaimSendSlot } from './send-pacing';
 import { transporterFor } from './mailer';
 import { indexEmail } from './es';
 
@@ -19,18 +19,20 @@ const worker = new Worker<EmailJobData>(
 
     if (email.status !== 'scheduled') return; // already handled, idempotent no-op
 
+    // Pacing gates first and atomically claims the slot, so a job that only
+    // gets pacing-delayed never touches (and never inflates) the hourly counter.
+    const paceDelay = await tryClaimSendSlot(email.senderId, email.delayMs);
+    if (paceDelay > 0) {
+      await job.moveToDelayed(Date.now() + paceDelay, token);
+      throw new DelayedError();
+    }
+
     const { allowed, retryAfterMs } = await tryConsumeHourlySlot(
       email.senderId,
       email.sender.hourlyLimit,
     );
     if (!allowed) {
       await job.moveToDelayed(Date.now() + retryAfterMs, token);
-      throw new DelayedError();
-    }
-
-    const paceDelay = await msUntilNextAllowedSend(email.senderId, email.delayMs);
-    if (paceDelay > 0) {
-      await job.moveToDelayed(Date.now() + paceDelay, token);
       throw new DelayedError();
     }
 
@@ -49,7 +51,6 @@ const worker = new Worker<EmailJobData>(
         text: email.body,
       });
 
-      await markSent(email.senderId);
       const sent = await prisma.scheduledEmail.update({
         where: { id: email.id },
         data: { status: 'sent', sentAt: new Date() },
