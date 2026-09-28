@@ -60,7 +60,6 @@ authRouter.post('/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-// Slack redirects back to our own domain, so the session cookie is still there.
 authRouter.get('/slack', requireAuth, (_req, res) => {
   const state = randomBytes(16).toString('hex');
   res.cookie(STATE_COOKIE, state, { ...cookieOpts, maxAge: 5 * 60 * 1000 });
