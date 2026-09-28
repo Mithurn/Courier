@@ -126,7 +126,7 @@ npm run typecheck # src and tests
 
 The tests run against real MySQL, Redis and Elasticsearch (from `docker compose up -d`), a fake local SMTP server and a fake Slack webhook. They cover access control and tenant isolation, validation, batch scheduling, quota and idempotency, exactly-once sending, retries, failure handling, worker restarts, lost-job recovery, the hourly limit with in-order deferral, and the Slack alert.
 
-GitHub Actions (`.github/workflows/backend-ci.yml`) runs typecheck, build, a production dependency audit and the tests against service containers. On `main` it also builds `backend/Dockerfile` and pushes it to GHCR. The same image runs the API (`node dist/server.js`) and the worker (`node dist/worker.js`). Run `npx prisma migrate deploy` against the target database before starting a new version.
+GitHub Actions (`.github/workflows/backend-ci.yml`) runs typecheck, build, a production dependency audit and the tests against service containers. On `main` it also builds `backend/Dockerfile` and pushes it to GHCR. The same image runs the API (`node dist/server.js`) and the worker (`node dist/worker.js`). The image contains no Prisma CLI, so run `npx prisma migrate deploy` from the repo or a CI step against the target database before starting a new version.
 
 ## Assumptions and trade-offs
 
