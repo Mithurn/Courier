@@ -15,6 +15,12 @@ const schema = z.object({
   BULLBOARD_PATH: z.string().default('/admin/queues'),
   JOB_RETRY_ATTEMPTS: z.coerce.number().default(5),
   JOB_RETRY_BACKOFF_MS: z.coerce.number().default(5000),
+
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+  GOOGLE_CALLBACK_URL: z.string().min(1),
+  JWT_SECRET: z.string().min(1),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
 });
 
 export const env = schema.parse(process.env);
