@@ -27,15 +27,13 @@ const worker = new Worker<EmailJobData>(
       throw new DelayedError();
     }
 
-    const { allowed, retryAfterMs } = await tryConsumeHourlySlot(
-      email.senderId,
-      email.sender.hourlyLimit,
-    );
+    const hourlyLimit = email.hourlyLimit ?? email.sender.hourlyLimit;
+    const { allowed, retryAfterMs } = await tryConsumeHourlySlot(email.senderId, hourlyLimit);
     if (!allowed) {
       if (await claimRateLimitAlert(email.senderId)) {
         await notifyRateLimitHit(
           email.sender.ownerId,
-          `:warning: *${email.sender.name}* hit its hourly limit (${email.sender.hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
+          `:warning: *${email.sender.name}* hit its hourly limit (${hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
         );
       }
       await job.moveToDelayed(Date.now() + retryAfterMs, token);
@@ -54,7 +52,7 @@ const worker = new Worker<EmailJobData>(
         from: email.sender.smtpUser,
         to: email.toEmail,
         subject: email.subject,
-        text: email.body,
+        html: email.body,
       });
 
       const sent = await prisma.scheduledEmail.update({

@@ -14,6 +14,15 @@ type EmailDoc = {
   senderId: string;
 };
 
+export type IndexableEmail = Pick<
+  ScheduledEmail,
+  'id' | 'toEmail' | 'subject' | 'body' | 'status' | 'scheduledAt' | 'sentAt' | 'senderId'
+>;
+
+function toDoc({ id: _id, ...doc }: IndexableEmail): EmailDoc {
+  return doc;
+}
+
 // Explicit mapping: senderId is the tenant filter, so it must be an exact-match keyword.
 export async function ensureIndex(): Promise<void> {
   const exists = await esClient.indices.exists({ index: env.ELASTICSEARCH_INDEX });
@@ -40,14 +49,15 @@ export async function ensureIndex(): Promise<void> {
   }
 }
 
-export async function searchEmails(senderIds: string[], query: string, page: number, pageSize: number) {
-  if (senderIds.length === 0) return { items: [], total: 0 };
+export async function searchEmailIds(senderIds: string[], query: string, page: number, pageSize: number) {
+  if (senderIds.length === 0) return { ids: [], total: 0 };
 
-  const result = await esClient.search<EmailDoc>({
+  const result = await esClient.search({
     index: env.ELASTICSEARCH_INDEX,
     from: (page - 1) * pageSize,
     size: pageSize,
     track_total_hits: true,
+    _source: false,
     query: {
       bool: {
         filter: { terms: { senderId: senderIds } },
@@ -60,19 +70,22 @@ export async function searchEmails(senderIds: string[], query: string, page: num
   });
 
   const total = typeof result.hits.total === 'number' ? result.hits.total : result.hits.total?.value ?? 0;
-  return { items: result.hits.hits.map((hit) => ({ id: hit._id, ...hit._source })), total };
+  return { ids: result.hits.hits.map((hit) => hit._id as string), total };
 }
 
 // Indexing failures never block a send; caller is expected to catch.
-export async function indexEmail(email: ScheduledEmail): Promise<void> {
-  const document: EmailDoc = {
-    toEmail: email.toEmail,
-    subject: email.subject,
-    body: email.body,
-    status: email.status,
-    scheduledAt: email.scheduledAt,
-    sentAt: email.sentAt,
-    senderId: email.senderId,
-  };
-  await esClient.index({ index: env.ELASTICSEARCH_INDEX, id: email.id, document });
+export async function indexEmail(email: IndexableEmail): Promise<void> {
+  await esClient.index({ index: env.ELASTICSEARCH_INDEX, id: email.id, document: toDoc(email) });
+}
+
+const BULK_CHUNK = 500;
+
+export async function indexEmails(emails: IndexableEmail[]): Promise<void> {
+  for (let i = 0; i < emails.length; i += BULK_CHUNK) {
+    const operations = emails
+      .slice(i, i + BULK_CHUNK)
+      .flatMap((email) => [{ index: { _index: env.ELASTICSEARCH_INDEX, _id: email.id } }, toDoc(email)]);
+    const res = await esClient.bulk({ operations });
+    if (res.errors) throw new Error('ES bulk index reported item errors');
+  }
 }
