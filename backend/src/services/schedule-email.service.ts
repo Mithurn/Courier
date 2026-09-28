@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { emailQueue, EmailJob } from '../queues/email-queue';
 import { env } from '../env';
+import { indexEmail } from '../es';
 
 export const scheduleEmailSchema = z.object({
   senderId: z.string().min(1),
@@ -14,7 +15,12 @@ export const scheduleEmailSchema = z.object({
 
 export type ScheduleEmailInput = z.infer<typeof scheduleEmailSchema>;
 
-export async function scheduleEmail(input: ScheduleEmailInput) {
+export class SenderNotOwnedError extends Error {}
+
+export async function scheduleEmail(input: ScheduleEmailInput, ownerId: string) {
+  const sender = await prisma.sender.findFirst({ where: { id: input.senderId, ownerId } });
+  if (!sender) throw new SenderNotOwnedError('Sender not found for this user');
+
   const email = await prisma.scheduledEmail.create({
     data: {
       senderId: input.senderId,
@@ -39,6 +45,8 @@ export async function scheduleEmail(input: ScheduleEmailInput) {
     await prisma.scheduledEmail.delete({ where: { id: email.id } });
     throw err;
   }
+
+  indexEmail(email).catch((err) => console.error('ES index failed:', err.message));
 
   return email;
 }
