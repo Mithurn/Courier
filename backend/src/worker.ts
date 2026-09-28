@@ -1,0 +1,82 @@
+import { DelayedError, Worker } from 'bullmq';
+import { redis } from './redis';
+import { env } from './env';
+import { prisma } from './prisma';
+import { QUEUE_NAME, EmailJobData } from './queues/email-queue';
+import { tryConsumeHourlySlot } from './rate-limit';
+import { msUntilNextAllowedSend, markSent } from './send-pacing';
+import { transporterFor } from './mailer';
+import { indexEmail } from './es';
+
+const worker = new Worker<EmailJobData>(
+  QUEUE_NAME,
+  async (job, token) => {
+    const email = await prisma.scheduledEmail.findUnique({
+      where: { id: job.data.emailId },
+      include: { sender: true },
+    });
+    if (!email) return; // deleted or bad data, nothing to do
+
+    if (email.status !== 'scheduled') return; // already handled, idempotent no-op
+
+    const { allowed, retryAfterMs } = await tryConsumeHourlySlot(
+      email.senderId,
+      email.sender.hourlyLimit,
+    );
+    if (!allowed) {
+      await job.moveToDelayed(Date.now() + retryAfterMs, token);
+      throw new DelayedError();
+    }
+
+    const paceDelay = await msUntilNextAllowedSend(email.senderId, email.delayMs);
+    if (paceDelay > 0) {
+      await job.moveToDelayed(Date.now() + paceDelay, token);
+      throw new DelayedError();
+    }
+
+    const locked = await prisma.scheduledEmail.updateMany({
+      where: { id: email.id, status: 'scheduled' },
+      data: { status: 'sending' },
+    });
+    if (locked.count === 0) return; // another worker/attempt already took it
+
+    try {
+      const transporter = transporterFor(email.sender);
+      await transporter.sendMail({
+        from: email.sender.smtpUser,
+        to: email.toEmail,
+        subject: email.subject,
+        text: email.body,
+      });
+
+      await markSent(email.senderId);
+      const sent = await prisma.scheduledEmail.update({
+        where: { id: email.id },
+        data: { status: 'sent', sentAt: new Date() },
+      });
+      await indexEmail(sent).catch((err) => console.error('ES index failed:', err.message));
+    } catch (err) {
+      const attemptsExhausted = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+      const failed = await prisma.scheduledEmail.update({
+        where: { id: email.id },
+        data: attemptsExhausted
+          ? { status: 'failed', failReason: (err as Error).message }
+          : { status: 'scheduled' }, // let BullMQ's retry pick it back up
+      });
+      await indexEmail(failed).catch((e) => console.error('ES index failed:', e.message));
+      throw err;
+    }
+  },
+  { connection: redis, concurrency: env.WORKER_CONCURRENCY },
+);
+
+worker.on('failed', (job, err) => {
+  console.error(`job ${job?.id} failed:`, err.message);
+});
+
+process.on('SIGTERM', async () => {
+  await worker.close();
+  process.exit(0);
+});
+
+console.log('Courier worker started');
