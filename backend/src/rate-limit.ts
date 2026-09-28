@@ -12,10 +12,7 @@ export function msUntilNextHour(date: Date): number {
   return next.getTime() - date.getTime();
 }
 
-/**
- * Atomically increments the sender's send count for the current hour window.
- * Returns whether this send is within the configured limit.
- */
+// Atomically increments the sender's count for this hour; true if still within limit.
 export async function tryConsumeHourlySlot(
   senderId: string,
   hourlyLimit: number,

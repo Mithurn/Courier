@@ -4,10 +4,7 @@ function lastSentKey(senderId: string): string {
   return `last-sent:${senderId}`;
 }
 
-/**
- * Enforces the configured minimum gap between sends for a sender.
- * Returns ms to wait if called too soon, 0 if clear to send now.
- */
+// Ms to wait before this sender can send again, 0 if clear now.
 export async function msUntilNextAllowedSend(
   senderId: string,
   minDelayMs: number,

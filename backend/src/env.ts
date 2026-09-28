@@ -13,8 +13,8 @@ const schema = z.object({
   BULLBOARD_USER: z.string().default('admin'),
   BULLBOARD_PASSWORD: z.string().min(1),
   BULLBOARD_PATH: z.string().default('/admin/queues'),
-  JOB_ATTEMPTS: z.coerce.number().default(5),
-  JOB_BACKOFF_DELAY_MS: z.coerce.number().default(5000),
+  JOB_RETRY_ATTEMPTS: z.coerce.number().default(5),
+  JOB_RETRY_BACKOFF_MS: z.coerce.number().default(5000),
 });
 
 export const env = schema.parse(process.env);
