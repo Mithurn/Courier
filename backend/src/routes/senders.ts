@@ -23,6 +23,7 @@ sendersRouter.post('/', async (req, res) => {
   const sender = await prisma.sender.create({
     data: {
       ...parsed.data,
+      ownerId: req.userId!,
       hourlyLimit: parsed.data.hourlyLimit ?? env.DEFAULT_SENDER_HOURLY_LIMIT,
     },
   });
@@ -30,7 +31,7 @@ sendersRouter.post('/', async (req, res) => {
   res.status(201).json(safeSender);
 });
 
-sendersRouter.get('/', async (_req, res) => {
-  const senders = await prisma.sender.findMany();
+sendersRouter.get('/', async (req, res) => {
+  const senders = await prisma.sender.findMany({ where: { ownerId: req.userId } });
   res.json(senders.map(({ smtpPass, ...rest }) => rest));
 });
