@@ -3,14 +3,13 @@ import { randomBytes } from 'crypto';
 import { env } from '../env';
 import { prisma } from '../prisma';
 import { googleAuthorizeUrl, exchangeCodeForProfile } from './google';
-import { signSession, verifySession, SESSION_COOKIE } from './session';
+import { signSession, SESSION_COOKIE } from './session';
 import { requireAuth } from './middleware';
 
 export const authRouter = Router();
 
 const STATE_COOKIE = 'oauth_state';
-// Same-site by port/subdomain (localhost:*, *.courier.<domain>) works with Lax.
-// A fully cross-site frontend domain would need SameSite: 'none' + secure + CORS credentials.
+// Lax requires the frontend and API to be same-site (e.g. frontend proxies /api to the backend).
 const cookieOpts = { httpOnly: true, sameSite: 'lax' as const, secure: env.GOOGLE_CALLBACK_URL.startsWith('https') };
 
 authRouter.get('/google', (_req, res) => {
@@ -22,28 +21,31 @@ authRouter.get('/google', (_req, res) => {
 authRouter.get('/google/callback', async (req, res) => {
   const { code, state } = req.query;
   const expectedState = req.cookies?.[STATE_COOKIE];
-  res.clearCookie(STATE_COOKIE);
+  res.clearCookie(STATE_COOKIE, cookieOpts);
 
   if (!code || typeof code !== 'string' || !state || state !== expectedState) {
     return res.status(400).send('Invalid OAuth state or missing code');
   }
 
-  const profile = await exchangeCodeForProfile(code);
+  try {
+    const profile = await exchangeCodeForProfile(code);
+    const user = await prisma.user.upsert({
+      where: { googleId: profile.id },
+      update: { name: profile.name, avatarUrl: profile.picture },
+      create: {
+        googleId: profile.id,
+        email: profile.email,
+        name: profile.name,
+        avatarUrl: profile.picture,
+      },
+    });
 
-  const user = await prisma.user.upsert({
-    where: { googleId: profile.id },
-    update: { name: profile.name, avatarUrl: profile.picture, email: profile.email },
-    create: {
-      googleId: profile.id,
-      email: profile.email,
-      name: profile.name,
-      avatarUrl: profile.picture,
-    },
-  });
-
-  const token = signSession({ userId: user.id });
-  res.cookie(SESSION_COOKIE, token, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.redirect(`${env.FRONTEND_URL}/dashboard`);
+    res.cookie(SESSION_COOKIE, signSession({ userId: user.id }), { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.redirect(`${env.FRONTEND_URL}/dashboard`);
+  } catch (err) {
+    console.error('Google login failed:', err);
+    res.redirect(`${env.FRONTEND_URL}/login?error=google`);
+  }
 });
 
 authRouter.get('/me', requireAuth, async (req, res) => {
@@ -53,9 +55,6 @@ authRouter.get('/me', requireAuth, async (req, res) => {
 });
 
 authRouter.post('/logout', (_req, res) => {
-  res.clearCookie(SESSION_COOKIE);
+  res.clearCookie(SESSION_COOKIE, cookieOpts);
   res.json({ ok: true });
 });
-
-// exported for reuse if a route needs to check a session without full middleware
-export { verifySession };
