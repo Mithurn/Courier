@@ -11,7 +11,7 @@ const schema = z.object({
   MIN_DELAY_BETWEEN_SENDS_MS: z.coerce.number().default(2000),
   DEFAULT_SENDER_HOURLY_LIMIT: z.coerce.number().default(50),
   BULLBOARD_USER: z.string().default('admin'),
-  BULLBOARD_PASSWORD: z.string().min(1),
+  BULLBOARD_PASSWORD: z.string().min(12),
   BULLBOARD_PATH: z.string().default('/admin/queues'),
   JOB_RETRY_ATTEMPTS: z.coerce.number().default(5),
   JOB_RETRY_BACKOFF_MS: z.coerce.number().default(5000),

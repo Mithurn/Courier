@@ -13,6 +13,7 @@ import { sendersRouter } from './routes/senders';
 import { authRouter } from './auth/routes';
 import { requireAuth } from './auth/middleware';
 import { ensureIndex } from './es';
+import { apiLimiter } from './middleware/rate-limit';
 import { prisma } from './prisma';
 
 const app = express();
@@ -27,8 +28,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/auth', authRouter);
-app.use('/emails', requireAuth, emailsRouter);
-app.use('/senders', requireAuth, sendersRouter);
+app.use('/emails', requireAuth, apiLimiter, emailsRouter);
+app.use('/senders', requireAuth, apiLimiter, sendersRouter);
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath(env.BULLBOARD_PATH);
