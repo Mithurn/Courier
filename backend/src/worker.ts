@@ -47,7 +47,7 @@ const worker = new Worker<EmailJobData>(
     }
 
     const hourlyLimit = email.hourlyLimit ?? email.sender.hourlyLimit;
-    const { allowed, retryAfterMs } = await tryConsumeHourlySlot(email.senderId, hourlyLimit);
+    const { allowed, retryAt } = await tryConsumeHourlySlot(email.senderId, hourlyLimit, email.scheduledAt);
     if (!allowed) {
       if (await claimRateLimitAlert(email.senderId)) {
         await notifyRateLimitHit(
@@ -55,7 +55,7 @@ const worker = new Worker<EmailJobData>(
           `:warning: *${email.sender.name}* hit its hourly limit (${hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
         );
       }
-      await job.moveToDelayed(Date.now() + retryAfterMs, token);
+      await job.moveToDelayed(retryAt, token);
       throw new DelayedError();
     }
 

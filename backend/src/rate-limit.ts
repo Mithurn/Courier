@@ -12,6 +12,12 @@ export function msUntilNextHour(date: Date): number {
   return HOUR_MS - (date.getTime() % HOUR_MS);
 }
 
+// Deferred jobs land 1ms apart per second of their original due time, so they keep their order at the next boundary.
+export function orderOffsetMs(now: Date, dueAt: Date): number {
+  const windowStart = now.getTime() - (now.getTime() % HOUR_MS);
+  return Math.min(Math.max(Math.floor((dueAt.getTime() - windowStart) / 1000), 0), 3599);
+}
+
 // SET NX + INCRBY in one MULTI works on any Redis version and never leaves a counter without a TTL.
 export async function incrWithinWindow(key: string, by: number, ttlSeconds: number): Promise<number> {
   const results = await redis.multi().set(key, 0, 'EX', ttlSeconds, 'NX').incrby(key, by).exec();
@@ -24,16 +30,17 @@ export async function incrWithinWindow(key: string, by: number, ttlSeconds: numb
 export async function tryConsumeHourlySlot(
   senderId: string,
   hourlyLimit: number,
-): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  dueAt: Date,
+): Promise<{ allowed: boolean; retryAt: number }> {
   const now = new Date();
   const key = hourWindowKey(senderId, now);
 
   const count = await incrWithinWindow(key, 1, 3700);
 
   if (count > hourlyLimit) {
-    return { allowed: false, retryAfterMs: msUntilNextHour(now) };
+    return { allowed: false, retryAt: now.getTime() + msUntilNextHour(now) + orderOffsetMs(now, dueAt) };
   }
-  return { allowed: true, retryAfterMs: 0 };
+  return { allowed: true, retryAt: 0 };
 }
 
 // One Slack alert per sender per hour, not one per job that hits the cap.
