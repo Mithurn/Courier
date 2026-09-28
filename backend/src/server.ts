@@ -34,7 +34,12 @@ createBullBoard({
 });
 app.use(env.BULLBOARD_PATH, bullBoardAuth, serverAdapter.getRouter());
 
-const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
+  if (res.headersSent) return next(err);
+
+  const status = Number(err.status ?? err.statusCode);
+  if (status >= 400 && status < 500) return res.status(status).json({ error: err.message });
+
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 };
