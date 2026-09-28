@@ -50,8 +50,7 @@ function dailyQuotaKey(userId: string): string {
 // Reserves `count` sends against the user's UTC-day quota; false (and nothing reserved) if it would exceed it.
 export async function tryReserveDailyQuota(userId: string, count: number, limit: number): Promise<boolean> {
   const key = dailyQuotaKey(userId);
-  const results = await redis.multi().incrby(key, count).expire(key, 90_000, 'NX').exec();
-  if (Number(results?.[0]?.[1]) > limit) {
+  if (!((await incrWithinWindow(key, count, 90_000)) <= limit)) {
     await redis.decrby(key, count);
     return false;
   }

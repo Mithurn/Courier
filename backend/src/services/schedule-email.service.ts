@@ -38,6 +38,8 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
   const delayMs = Math.max(input.delayBetweenSendsMs ?? 0, env.MIN_DELAY_BETWEEN_SENDS_MS);
   const startMs = (input.startAt ?? new Date()).getTime();
 
+  const hourlyLimit = Math.min(input.hourlyLimit ?? sender.hourlyLimit, sender.hourlyLimit);
+
   const rows = recipients.map((toEmail, i) => ({
     id: randomUUID(),
     senderId: sender.id,
@@ -46,7 +48,7 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
     body: input.body,
     scheduledAt: new Date(startMs + i * delayMs),
     delayMs,
-    hourlyLimit: input.hourlyLimit ?? null,
+    hourlyLimit,
     status: 'scheduled' as const,
     sentAt: null,
   }));
@@ -72,6 +74,7 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
 
   return {
     count: rows.length,
+    hourlyLimit,
     firstScheduledAt: rows[0].scheduledAt,
     lastScheduledAt: rows[rows.length - 1].scheduledAt,
   };

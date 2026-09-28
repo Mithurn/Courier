@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { claimIdempotencyKey, releaseIdempotencyKey } from '../idempotency';
 import { scheduleLimiter } from '../middleware/rate-limit';
 import {
   DailyQuotaExceededError,
@@ -16,15 +17,29 @@ const pageSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 const sentQuerySchema = pageSchema.extend({ status: z.enum(['sent', 'failed']).optional() });
-const searchQuerySchema = pageSchema.extend({ q: z.string().trim().max(200).default('') });
+const MAX_RESULT_WINDOW = 10_000;
+const searchQuerySchema = pageSchema
+  .extend({ q: z.string().trim().max(200).default('') })
+  .refine((v) => v.page * v.pageSize <= MAX_RESULT_WINDOW, 'Cannot page past the first 10,000 results');
+const idempotencyKeySchema = z.string().min(8).max(128);
 
 emailsRouter.post('/schedule', scheduleLimiter, async (req, res) => {
   const parsed = scheduleEmailSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const rawKey = req.get('Idempotency-Key');
+  const keyResult = rawKey === undefined ? undefined : idempotencyKeySchema.safeParse(rawKey);
+  if (keyResult && !keyResult.success) return res.status(400).json({ error: 'Invalid Idempotency-Key' });
+  const idempotencyKey = keyResult?.data;
+
+  if (idempotencyKey && !(await claimIdempotencyKey(req.userId!, idempotencyKey))) {
+    return res.status(409).json({ error: 'Duplicate request' });
+  }
+
   try {
     res.status(201).json(await scheduleEmails(parsed.data, req.userId!));
   } catch (err) {
+    if (idempotencyKey) await releaseIdempotencyKey(req.userId!, idempotencyKey);
     if (err instanceof SenderNotOwnedError) return res.sendStatus(404);
     if (err instanceof DailyQuotaExceededError) return res.status(429).json({ error: err.message });
     throw err;
