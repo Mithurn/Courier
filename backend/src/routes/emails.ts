@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
-import { scheduleEmail, scheduleEmailSchema } from '../services/schedule-email.service';
+import { scheduleEmail, scheduleEmailSchema, SenderNotOwnedError } from '../services/schedule-email.service';
+import { searchEmails } from '../es';
 
 export const emailsRouter = Router();
 
@@ -10,22 +11,34 @@ emailsRouter.post('/schedule', async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const email = await scheduleEmail(parsed.data);
-  res.status(201).json(email);
+  try {
+    const email = await scheduleEmail(parsed.data, req.userId!);
+    res.status(201).json(email);
+  } catch (err) {
+    if (err instanceof SenderNotOwnedError) return res.sendStatus(404);
+    throw err;
+  }
 });
 
-emailsRouter.get('/scheduled', async (_req, res) => {
+emailsRouter.get('/scheduled', async (req, res) => {
   const emails = await prisma.scheduledEmail.findMany({
-    where: { status: 'scheduled' },
+    where: { status: 'scheduled', sender: { ownerId: req.userId } },
     orderBy: { scheduledAt: 'asc' },
   });
   res.json(emails);
 });
 
-emailsRouter.get('/sent', async (_req, res) => {
+emailsRouter.get('/sent', async (req, res) => {
   const emails = await prisma.scheduledEmail.findMany({
-    where: { status: { in: ['sent', 'failed'] } },
+    where: { status: { in: ['sent', 'failed'] }, sender: { ownerId: req.userId } },
     orderBy: { sentAt: 'desc' },
   });
   res.json(emails);
+});
+
+emailsRouter.get('/search', async (req, res) => {
+  const senders = await prisma.sender.findMany({ where: { ownerId: req.userId }, select: { id: true } });
+  const q = typeof req.query.q === 'string' ? req.query.q : '';
+  const results = await searchEmails(senders.map((s) => s.id), q);
+  res.json(results);
 });
