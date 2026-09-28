@@ -1,0 +1,102 @@
+name: courier
+
+x-app: &app
+  image: ${API_IMAGE:-ghcr.io/mithurn/courier-backend:latest}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/courier
+    REDIS_URL: redis://redis:6379
+    ELASTICSEARCH_URL: http://elasticsearch:9200
+    FRONTEND_URL: https://${DOMAIN}
+    GOOGLE_CALLBACK_URL: https://${DOMAIN}/api/auth/google/callback
+    SLACK_REDIRECT_URI: https://${DOMAIN}/api/auth/slack/callback
+    TRUST_PROXY_HOPS: "1"
+  depends_on:
+    mysql: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    elasticsearch: { condition: service_healthy }
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: courier
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: ${MIGRATE_IMAGE:-ghcr.io/mithurn/courier-backend-migrate:latest}
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/courier
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  api:
+    <<: *app
+    command: ["node", "dist/server.js"]
+
+  worker:
+    <<: *app
+    command: ["node", "dist/worker.js"]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend-dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  mysql_data:
+  redis_data:
+  es_data:
+  caddy_data:
+  caddy_config:
