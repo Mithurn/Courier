@@ -70,21 +70,24 @@ authRouter.get('/slack', requireAuth, (_req, res) => {
 authRouter.get('/slack/callback', requireAuth, async (req, res) => {
   const { code, state } = req.query;
   const expectedState = req.cookies?.[STATE_COOKIE];
-  res.clearCookie(STATE_COOKIE);
+  res.clearCookie(STATE_COOKIE, cookieOpts);
 
   if (!code || typeof code !== 'string' || !state || state !== expectedState) {
-    return res.status(400).send('Invalid OAuth state or missing code');
+    return res.redirect(`${env.FRONTEND_URL}/dashboard?slack=error`);
   }
 
-  const install = await exchangeCodeForSlackInstall(code);
-
-  await prisma.slackIntegration.upsert({
-    where: { userId: req.userId! },
-    update: install,
-    create: { userId: req.userId!, ...install },
-  });
-
-  res.redirect(`${env.FRONTEND_URL}/dashboard?slack=connected`);
+  try {
+    const install = await exchangeCodeForSlackInstall(code);
+    await prisma.slackIntegration.upsert({
+      where: { userId: req.userId! },
+      update: install,
+      create: { userId: req.userId!, ...install },
+    });
+    res.redirect(`${env.FRONTEND_URL}/dashboard?slack=connected`);
+  } catch (err) {
+    console.error('Slack install failed:', err);
+    res.redirect(`${env.FRONTEND_URL}/dashboard?slack=error`);
+  }
 });
 
 authRouter.get('/slack/status', requireAuth, async (req, res) => {

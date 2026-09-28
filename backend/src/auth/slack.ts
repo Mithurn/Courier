@@ -6,7 +6,7 @@ const TOKEN_URL = 'https://slack.com/api/oauth.v2.access';
 export function slackAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: env.SLACK_CLIENT_ID,
-    scope: 'chat:write,incoming-webhook',
+    scope: 'incoming-webhook',
     redirect_uri: env.SLACK_REDIRECT_URI,
     state,
   });
