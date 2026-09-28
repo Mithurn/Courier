@@ -5,11 +5,11 @@ function hourWindowKey(senderId: string, date: Date): string {
   return `rl:${senderId}:${stamp}`;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+// Window keys are UTC hours, so the boundary must be too (local-time math breaks in half-hour zones like IST).
 export function msUntilNextHour(date: Date): number {
-  const next = new Date(date);
-  next.setMinutes(0, 0, 0);
-  next.setHours(next.getHours() + 1);
-  return next.getTime() - date.getTime();
+  return HOUR_MS - (date.getTime() % HOUR_MS);
 }
 
 // Atomically increments the sender's count for this hour; true if still within limit.
@@ -20,10 +20,8 @@ export async function tryConsumeHourlySlot(
   const now = new Date();
   const key = hourWindowKey(senderId, now);
 
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3700);
-  }
+  const results = await redis.multi().incr(key).expire(key, 3700, 'NX').exec();
+  const count = Number(results?.[0]?.[1]);
 
   if (count > hourlyLimit) {
     return { allowed: false, retryAfterMs: msUntilNextHour(now) };
