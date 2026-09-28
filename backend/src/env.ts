@@ -9,7 +9,7 @@ const schema = z.object({
   PORT: z.coerce.number().default(4000),
   WORKER_CONCURRENCY: z.coerce.number().default(5),
   MIN_DELAY_BETWEEN_SENDS_MS: z.coerce.number().default(2000),
-  MAX_EMAILS_PER_HOUR_PER_SENDER: z.coerce.number().default(50),
+  DEFAULT_SENDER_HOURLY_LIMIT: z.coerce.number().default(50),
   BULLBOARD_USER: z.string().default('admin'),
   BULLBOARD_PASSWORD: z.string().min(1),
   BULLBOARD_PATH: z.string().default('/admin/queues'),

@@ -23,7 +23,7 @@ sendersRouter.post('/', async (req, res) => {
   const sender = await prisma.sender.create({
     data: {
       ...parsed.data,
-      hourlyLimit: parsed.data.hourlyLimit ?? env.MAX_EMAILS_PER_HOUR_PER_SENDER,
+      hourlyLimit: parsed.data.hourlyLimit ?? env.DEFAULT_SENDER_HOURLY_LIMIT,
     },
   });
   res.status(201).json({ ...sender, smtpPass: undefined });
