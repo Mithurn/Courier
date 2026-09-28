@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
@@ -8,18 +9,22 @@ import { emailQueue } from './queues/email-queue';
 import { bullBoardAuth } from './bullboard-auth';
 import { emailsRouter } from './routes/emails';
 import { sendersRouter } from './routes/senders';
+import { authRouter } from './auth/routes';
+import { requireAuth } from './auth/middleware';
 import { ensureIndex } from './es';
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.use('/emails', emailsRouter);
-app.use('/senders', sendersRouter);
+app.use('/auth', authRouter);
+app.use('/emails', requireAuth, emailsRouter);
+app.use('/senders', requireAuth, sendersRouter);
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath(env.BULLBOARD_PATH);
