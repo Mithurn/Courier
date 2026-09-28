@@ -28,10 +28,17 @@ export async function scheduleEmail(input: ScheduleEmailInput) {
 
   const delay = Math.max(0, input.scheduledAt.getTime() - Date.now());
 
-  await emailQueue.add(EmailJob.SEND, { emailId: email.id }, {
-    jobId: email.id,
-    delay,
-  });
+  try {
+    await emailQueue.add(EmailJob.SEND, { emailId: email.id }, {
+      jobId: email.id,
+      delay,
+    });
+  } catch (err) {
+    // Enqueue failed after the row was created; roll it back so it doesn't
+    // sit stuck as "scheduled" with no job behind it.
+    await prisma.scheduledEmail.delete({ where: { id: email.id } });
+    throw err;
+  }
 
   return email;
 }
