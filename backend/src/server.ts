@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createBullBoard } from '@bull-board/api';
@@ -33,6 +33,12 @@ createBullBoard({
   serverAdapter,
 });
 app.use(env.BULLBOARD_PATH, bullBoardAuth, serverAdapter.getRouter());
+
+const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+};
+app.use(errorHandler);
 
 ensureIndex().catch((err) => console.error('failed to ensure ES index:', err.message));
 
