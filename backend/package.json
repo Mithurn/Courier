@@ -9,7 +9,10 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "start:worker": "node dist/worker.js",
+    "test": "tsx test/prepare.ts && node --import tsx --import ./test/env.ts --test --test-force-exit --test-concurrency=1 \"test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@bull-board/api": "^9.10.1",
@@ -36,7 +39,9 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^22.5.0",
     "@types/nodemailer": "^8.0.2",
+    "@types/smtp-server": "^3.5.13",
     "prisma": "^6.14.0",
+    "smtp-server": "^3.19.15",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4"
   }
