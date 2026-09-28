@@ -7,6 +7,7 @@ import { slackAuthorizeUrl, exchangeCodeForSlackInstall } from './slack';
 import { signSession, SESSION_COOKIE } from './session';
 import { requireAuth } from './middleware';
 import { oauthLimiter } from '../middleware/rate-limit';
+import { provisionSender } from '../services/sender.service';
 
 export const authRouter = Router();
 
@@ -41,6 +42,10 @@ authRouter.get('/google/callback', oauthLimiter, async (req, res) => {
         avatarUrl: profile.picture,
       },
     });
+
+    if ((await prisma.sender.count({ where: { ownerId: user.id } })) === 0) {
+      await provisionSender(user.id).catch((err) => console.error('Default sender provisioning failed:', err.message));
+    }
 
     res.cookie(SESSION_COOKIE, signSession({ userId: user.id }), { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.redirect(`${env.FRONTEND_URL}/dashboard`);
