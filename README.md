@@ -128,6 +128,17 @@ The tests run against real MySQL, Redis and Elasticsearch (from `docker compose 
 
 GitHub Actions (`.github/workflows/backend-ci.yml`) runs typecheck, build, a production dependency audit and the tests against service containers. On `main` it also builds `backend/Dockerfile` and pushes it to GHCR. The same image runs the API (`node dist/server.js`) and the worker (`node dist/worker.js`). The image contains no Prisma CLI, so run `npx prisma migrate deploy` from the repo or a CI step against the target database before starting a new version.
 
+## Deploying
+
+Run the same image twice: the API (`node dist/server.js`) and the worker (`node dist/worker.js`). Both need the same environment. Backing services: MySQL 8, Redis 7 or newer, Elasticsearch 8. Run `npx prisma migrate deploy` from the repo or CI against the target database before the first start, then start the API, then the worker.
+
+Checklist:
+1. Set every variable in `backend/.env.example` on both processes. `JWT_SECRET` needs 32+ characters and `BULLBOARD_PASSWORD` 12+. Set `FRONTEND_URL` to the deployed frontend and `TRUST_PROXY_HOPS` to the number of proxies in front of the API.
+2. Add the production callback URLs (`GOOGLE_CALLBACK_URL`, `SLACK_REDIRECT_URI`) to the Google and Slack app consoles.
+3. Serve the frontend and API on one site, for example by proxying `/api` and `/auth` to the API, so the `SameSite=Lax` cookie is sent.
+4. Recreate the Elasticsearch index if one already exists from before the explicit mapping.
+5. Check `GET /health`, load `/admin/queues`, log in with Google, schedule an email, restart the worker before it is due, and trigger one rate-limit alert.
+
 ## Assumptions and trade-offs
 
 - The body is stored once per recipient row. A separate campaign table would save space but needs more schema.
