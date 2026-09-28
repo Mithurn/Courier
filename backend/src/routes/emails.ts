@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { scheduleEmails, scheduleEmailSchema, SenderNotOwnedError } from '../services/schedule-email.service';
+import { scheduleLimiter } from '../middleware/rate-limit';
+import {
+  DailyQuotaExceededError,
+  scheduleEmails,
+  scheduleEmailSchema,
+  SenderNotOwnedError,
+} from '../services/schedule-email.service';
 import { countByTab, getEmail, listScheduled, listSent, searchEmails } from '../services/email-list.service';
 
 export const emailsRouter = Router();
@@ -12,7 +18,7 @@ const pageSchema = z.object({
 const sentQuerySchema = pageSchema.extend({ status: z.enum(['sent', 'failed']).optional() });
 const searchQuerySchema = pageSchema.extend({ q: z.string().trim().max(200).default('') });
 
-emailsRouter.post('/schedule', async (req, res) => {
+emailsRouter.post('/schedule', scheduleLimiter, async (req, res) => {
   const parsed = scheduleEmailSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -20,6 +26,7 @@ emailsRouter.post('/schedule', async (req, res) => {
     res.status(201).json(await scheduleEmails(parsed.data, req.userId!));
   } catch (err) {
     if (err instanceof SenderNotOwnedError) return res.sendStatus(404);
+    if (err instanceof DailyQuotaExceededError) return res.status(429).json({ error: err.message });
     throw err;
   }
 });

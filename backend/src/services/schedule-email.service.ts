@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { emailQueue, EmailJob } from '../queues/email-queue';
 import { env } from '../env';
+import { tryReserveDailyQuota, releaseDailyQuota } from '../rate-limit';
 import { indexEmails, type IndexableEmail } from '../es';
 
 export const MAX_RECIPIENTS = 5000;
@@ -24,12 +25,16 @@ export const scheduleEmailSchema = z.object({
 export type ScheduleEmailInput = z.infer<typeof scheduleEmailSchema>;
 
 export class SenderNotOwnedError extends Error {}
+export class DailyQuotaExceededError extends Error {}
 
 export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string) {
   const sender = await prisma.sender.findFirst({ where: { id: input.senderId, ownerId } });
   if (!sender) throw new SenderNotOwnedError('Sender not found for this user');
 
   const recipients = [...new Set(input.recipients)];
+  if (!(await tryReserveDailyQuota(ownerId, recipients.length, env.DAILY_EMAIL_QUOTA_PER_USER))) {
+    throw new DailyQuotaExceededError('Daily scheduling quota exceeded');
+  }
   const delayMs = Math.max(input.delayBetweenSendsMs ?? 0, env.MIN_DELAY_BETWEEN_SENDS_MS);
   const startMs = (input.startAt ?? new Date()).getTime();
 
@@ -46,10 +51,9 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
     sentAt: null,
   }));
 
-  await prisma.scheduledEmail.createMany({ data: rows });
-
   const now = Date.now();
   try {
+    await prisma.scheduledEmail.createMany({ data: rows });
     await emailQueue.addBulk(
       rows.map((row) => ({
         name: EmailJob.SEND,
@@ -59,6 +63,7 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
     );
   } catch (err) {
     await prisma.scheduledEmail.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+    await releaseDailyQuota(ownerId, rows.length);
     throw err;
   }
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { senderCreateLimiter } from '../middleware/rate-limit';
 import { prisma } from '../prisma';
 import { provisionSender, SenderLimitError, toSenderDto } from '../services/sender.service';
 
@@ -14,7 +15,7 @@ sendersRouter.get('/', async (req, res) => {
   res.json(senders.map(toSenderDto));
 });
 
-sendersRouter.post('/', async (req, res) => {
+sendersRouter.post('/', senderCreateLimiter, async (req, res) => {
   const parsed = createSenderSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

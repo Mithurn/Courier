@@ -42,3 +42,22 @@ export async function claimRateLimitAlert(senderId: string): Promise<boolean> {
   const claimed = await redis.set(key, '1', 'EX', 3700, 'NX');
   return claimed === 'OK';
 }
+
+function dailyQuotaKey(userId: string): string {
+  return `quota:${userId}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+// Reserves `count` sends against the user's UTC-day quota; false (and nothing reserved) if it would exceed it.
+export async function tryReserveDailyQuota(userId: string, count: number, limit: number): Promise<boolean> {
+  const key = dailyQuotaKey(userId);
+  const results = await redis.multi().incrby(key, count).expire(key, 90_000, 'NX').exec();
+  if (Number(results?.[0]?.[1]) > limit) {
+    await redis.decrby(key, count);
+    return false;
+  }
+  return true;
+}
+
+export async function releaseDailyQuota(userId: string, count: number): Promise<void> {
+  await redis.decrby(dailyQuotaKey(userId), count);
+}

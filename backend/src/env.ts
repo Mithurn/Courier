@@ -10,6 +10,7 @@ const schema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().default(5),
   MIN_DELAY_BETWEEN_SENDS_MS: z.coerce.number().default(2000),
   DEFAULT_SENDER_HOURLY_LIMIT: z.coerce.number().default(50),
+  DAILY_EMAIL_QUOTA_PER_USER: z.coerce.number().default(5000),
   BULLBOARD_USER: z.string().default('admin'),
   BULLBOARD_PASSWORD: z.string().min(12),
   BULLBOARD_PATH: z.string().default('/admin/queues'),
