@@ -36,7 +36,10 @@ export function EmailListPage({ tab }: { tab: Tab }) {
   const [data, setData] = useState<Page<EmailListItem>>({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(() => {
+    const notice = (location.state as { notice?: string } | null)?.notice;
+    return notice ? { message: notice, variant: 'success' } : null;
+  });
 
   useEffect(() => {
     setStatusFilter('all');
@@ -67,11 +70,6 @@ export function EmailListPage({ tab }: { tab: Tab }) {
       const [items, nextCounts] = await Promise.all([list, api.counts()]);
       setData(items);
       setCounts(nextCounts);
-
-      if (prevSentRef.current !== null && nextCounts.sent > prevSentRef.current) {
-        const diff = nextCounts.sent - prevSentRef.current;
-        setNotice(`${diff} email${diff > 1 ? 's' : ''} sent successfully!`);
-      }
       prevSentRef.current = nextCounts.sent;
     } catch (err) {
       setError((err as Error).message);
@@ -91,13 +89,44 @@ export function EmailListPage({ tab }: { tab: Tab }) {
       setData(items);
       setCounts(nextCounts);
 
+      // Only notify when sent count strictly increases from previous check
       if (prevSentRef.current !== null && nextCounts.sent > prevSentRef.current) {
         const diff = nextCounts.sent - prevSentRef.current;
-        setNotice(`${diff} email${diff > 1 ? 's' : ''} sent successfully!`);
+        prevSentRef.current = nextCounts.sent;
+
+        try {
+          const recent = await api.sent(1);
+          const finishedBatch = recent.items.slice(0, diff);
+          const failedCount = finishedBatch.filter((e) => e.status === 'failed').length;
+          const sentCount = diff - failedCount;
+
+          if (failedCount > 0 && sentCount > 0) {
+            setToast({
+              message: `${sentCount} sent, ${failedCount} failed delivery`,
+              variant: 'error',
+            });
+          } else if (failedCount > 0) {
+            setToast({
+              message: `${failedCount} email${failedCount > 1 ? 's' : ''} failed delivery`,
+              variant: 'error',
+            });
+          } else {
+            setToast({
+              message: diff === 1 ? '1 email sent successfully!' : `${diff} emails sent successfully!`,
+              variant: 'success',
+            });
+          }
+        } catch {
+          setToast({
+            message: diff === 1 ? '1 email sent successfully!' : `${diff} emails sent successfully!`,
+            variant: 'success',
+          });
+        }
+      } else {
+        prevSentRef.current = nextCounts.sent;
       }
-      prevSentRef.current = nextCounts.sent;
     } catch {
-      // ignore poll errors
+      // background polling errors are ignored
     }
   }, [tab, page, query, statusFilter, labelFilter, setCounts]);
 
@@ -110,7 +139,7 @@ export function EmailListPage({ tab }: { tab: Tab }) {
   }, [load, poll]);
 
   useEffect(() => {
-    if (notice) navigate(location.pathname, { replace: true, state: {} });
+    if (toast) navigate(location.pathname, { replace: true, state: {} });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -214,7 +243,7 @@ export function EmailListPage({ tab }: { tab: Tab }) {
         onToggleStar={toggleStar}
       />
 
-      {notice && <Toast message={notice} onDismiss={() => setNotice('')} />}
+      {toast && <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />}
     </>
   );
 }
