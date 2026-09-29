@@ -1,7 +1,8 @@
-import express, { type ErrorRequestHandler } from 'express';
+import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
@@ -13,6 +14,7 @@ import { sendersRouter } from './routes/senders';
 import { authRouter } from './auth/routes';
 import { requireAuth } from './auth/middleware';
 import { apiLimiter } from './middleware/rate-limit';
+import { openapiSpec } from './openapi';
 
 export const app = express();
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
@@ -24,6 +26,18 @@ app.use(cookieParser());
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+app.get('/openapi.json', (_req, res) => res.json(openapiSpec));
+app.use(
+  '/docs',
+  // Swagger UI's bootstrap page needs inline script/style; helmet's default CSP blocks both.
+  ((_req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';");
+    next();
+  }) as RequestHandler,
+  swaggerUi.serve,
+  swaggerUi.setup(openapiSpec),
+);
 
 app.use('/auth', authRouter);
 app.use('/emails', requireAuth, apiLimiter, emailsRouter);

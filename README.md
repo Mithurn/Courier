@@ -20,6 +20,8 @@ npm run worker                       # in a second terminal
 
 Bull Board is at `http://localhost:4000/admin/queues` (basic auth from `BULLBOARD_USER` / `BULLBOARD_PASSWORD`).
 
+API docs (OpenAPI/Swagger UI) are at `http://localhost:4000/docs`, spec at `http://localhost:4000/openapi.json`.
+
 ### Environment
 
 | Variable | Purpose |
