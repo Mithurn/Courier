@@ -28,6 +28,15 @@ export function Toast({ message, onDismiss }: { message: string; onDismiss: () =
   );
 }
 
+export function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent ${className}`}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div className="mb-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">

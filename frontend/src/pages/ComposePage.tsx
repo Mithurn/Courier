@@ -1,11 +1,13 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Button, ErrorBanner } from '../components/ui';
-import { AttachmentIcon, BackIcon, CalendarIcon, ClockIcon, UploadIcon } from '../components/icons';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { Button, ErrorBanner, Spinner } from '../components/ui';
+import { AttachmentIcon, BackIcon, CalendarIcon, ChevronDownIcon, ClockIcon, UploadIcon } from '../components/icons';
 import { MessageEditor } from '../components/MessageEditor';
 
+const isDev = import.meta.env.DEV;
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
 const extractEmails = (text: string) => [...new Set((text.match(EMAIL_PATTERN) ?? []).map((e) => e.toLowerCase()))];
@@ -22,16 +24,14 @@ const fileToDataUrl = (file: File) =>
 
 function FieldRow({ label, divider = true, children }: { label: string; divider?: boolean; children: ReactNode }) {
   return (
-    <div
-      className={`flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4 sm:py-3.5 ${divider ? 'border-b border-divider' : ''}`}
-    >
-      <span className="w-full shrink-0 pt-1.5 text-sm text-ink sm:w-24">{label}</span>
-      <div className="min-w-0 flex-1">{children}</div>
+    <div className="flex min-h-[39px] w-full items-center gap-1.5">
+      <span className="w-12 shrink-0 text-sm text-ink">{label}</span>
+      <div className={`flex min-h-[39px] min-w-0 flex-1 items-center ${divider ? 'border-b border-divider' : ''}`}>{children}</div>
     </div>
   );
 }
 
-const fieldClass = 'w-full min-w-0 bg-transparent py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none';
+const fieldClass = 'w-full min-w-0 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none';
 
 const SEND_LATER_PRESETS = [
   { label: 'Tomorrow', hour: 9 },
@@ -52,6 +52,17 @@ function toLocalInputValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function formatPickedDate(value: string) {
+  const date = new Date(value);
+  return date.toLocaleString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function SendLaterPopover({
   startAt,
   onPick,
@@ -64,23 +75,28 @@ function SendLaterPopover({
   const [draft, setDraft] = useState(startAt);
 
   return (
-    <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-lg border border-border bg-white p-4 shadow-lg">
+    <div className="absolute right-0 top-full z-20 mt-2 flex h-[364px] w-[318px] max-w-[calc(100vw-2rem)] flex-col rounded-[10px] border border-border bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
       <p className="text-sm font-semibold text-ink">Send Later</p>
-      <label className="mt-3 flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted">
+
+      <label className="relative mt-4 flex cursor-pointer items-center justify-between border-b border-divider pb-3">
+        <span className={`text-sm ${draft ? 'text-ink' : 'text-muted'}`}>
+          {draft ? formatPickedDate(draft) : 'Pick date & time'}
+        </span>
+        <CalendarIcon className="pointer-events-none shrink-0 text-icon" />
         <input
           type="datetime-local"
-          className="min-w-0 flex-1 bg-transparent focus:outline-none"
+          className="absolute inset-0 cursor-pointer opacity-0"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <CalendarIcon className="shrink-0 text-icon" />
       </label>
-      <ul className="mt-3 space-y-2.5">
+
+      <ul className="mt-4 flex flex-col gap-3">
         {SEND_LATER_PRESETS.map((preset) => (
           <li key={preset.label}>
             <button
               type="button"
-              className="text-sm text-ink hover:text-brand"
+              className="text-left text-sm text-muted hover:text-ink"
               onClick={() => setDraft(toLocalInputValue(tomorrowAt(preset.hour)))}
             >
               {preset.label}
@@ -88,7 +104,8 @@ function SendLaterPopover({
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex justify-end gap-4 text-sm">
+
+      <div className="mt-auto flex justify-end gap-4 pt-4 text-sm">
         <button type="button" className="font-medium text-ink" onClick={onClose}>
           Cancel
         </button>
@@ -108,25 +125,40 @@ function SendLaterPopover({
 }
 
 export function ComposePage() {
-  const { senders } = useAuth();
+  const { senders, user } = useAuth();
   const navigate = useNavigate();
 
   const [senderId, setSenderId] = useState(senders[0]?.id ?? '');
-  const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<string[]>(isDev ? ['recipient@example.com'] : []);
   const [recipientDraft, setRecipientDraft] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [subject, setSubject] = useState(isDev ? 'Demo subject' : '');
+  const [body, setBody] = useState(isDev ? '<p>Demo message for local UI review.</p>' : '');
   const [startAt, setStartAt] = useState('');
-  const [delaySeconds, setDelaySeconds] = useState('2');
+  const [delaySeconds, setDelaySeconds] = useState('');
   const [hourlyLimit, setHourlyLimit] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showSendLater, setShowSendLater] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState('');
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const listInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (senders[0] && !senderId) setSenderId(senders[0].id);
+  }, [senders, senderId]);
+
+  const attachmentUrls = useMemo(() => attachments.map((file) => URL.createObjectURL(file)), [attachments]);
+
+  useEffect(() => () => attachmentUrls.forEach((url) => URL.revokeObjectURL(url)), [attachmentUrls]);
 
   const visibleChips = recipients.slice(0, 3);
   const overflowCount = recipients.length - visibleChips.length;
+  const hasAttachments = attachments.length > 0;
+  const hasSchedule = Boolean(startAt);
+  const sendersLoading = user && senders.length === 0;
 
   function addRecipients(text: string) {
     const found = extractEmails(text);
@@ -153,9 +185,30 @@ export function ComposePage() {
     }
   }
 
-  async function handleFile(file: File | undefined) {
+  async function handleListUpload(file: File | undefined) {
     if (!file) return;
-    addRecipients(await file.text());
+    setLoadingList(true);
+    setError('');
+    try {
+      addRecipients(await file.text());
+    } catch {
+      setError('Could not read recipient list.');
+    } finally {
+      setLoadingList(false);
+      if (listInputRef.current) listInputRef.current.value = '';
+    }
+  }
+
+  async function handleAttachmentPick(files: FileList | null) {
+    if (!files?.length) return;
+    setLoadingAttachments(true);
+    setError('');
+    try {
+      setAttachments((current) => [...current, ...Array.from(files)]);
+    } finally {
+      setLoadingAttachments(false);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -183,24 +236,36 @@ export function ComposePage() {
     }
   }
 
+  const canSend = Boolean(senderId) && recipients.length > 0 && !isBodyEmpty(body) && subject.trim().length > 0;
+
+  if (user === undefined) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-muted">
+        <Spinner />
+        Loading…
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 p-4 sm:p-6">
-      <div className="flex items-center justify-between gap-2.5">
+    <form onSubmit={handleSubmit} className="flex w-full flex-col">
+      <div className="flex w-full items-center justify-between gap-5 px-4 pt-5 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
             <BackIcon />
           </button>
           <h1 className="truncate text-xl text-ink sm:text-2xl">Compose New Email</h1>
         </div>
-        <div className="relative flex shrink-0 items-center gap-4">
+        <div className="relative flex h-[34px] shrink-0 items-center gap-[10px]">
           <button
             type="button"
             onClick={() => attachmentInputRef.current?.click()}
+            disabled={loadingAttachments}
             aria-label="Attach image"
-            className="relative text-icon hover:text-ink"
+            className={`relative flex h-6 w-6 items-center justify-center ${hasAttachments ? 'text-brand' : 'text-icon'} hover:text-ink disabled:opacity-60`}
           >
-            <AttachmentIcon />
-            {attachments.length > 0 && (
+            {loadingAttachments ? <Spinner className="h-4 w-4" /> : <AttachmentIcon />}
+            {hasAttachments && !loadingAttachments && (
               <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">
                 {attachments.length}
               </span>
@@ -212,109 +277,175 @@ export function ComposePage() {
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => setAttachments((current) => [...current, ...Array.from(e.target.files ?? [])])}
+            onChange={(e) => void handleAttachmentPick(e.target.files)}
           />
-          <button type="button" onClick={() => setShowSendLater((v) => !v)} aria-label="Send later" className="text-icon hover:text-ink">
-            <ClockIcon className="h-4 w-4" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowSendLater((v) => !v)}
+              aria-label="Send later"
+              aria-expanded={showSendLater}
+              className={`flex h-6 w-6 items-center justify-center ${hasSchedule ? 'text-brand' : 'text-icon'} hover:text-ink`}
+            >
+              <ClockIcon className="h-4 w-4" />
+            </button>
+            {showSendLater && (
+              <SendLaterPopover startAt={startAt} onPick={setStartAt} onClose={() => setShowSendLater(false)} />
+            )}
+          </div>
           <Button
             type="submit"
             variant="ghost"
-            disabled={submitting || recipients.length === 0 || !senderId || isBodyEmpty(body)}
+            disabled={submitting || !canSend}
+            className={`h-[34px] px-[19px] py-[7px] text-sm leading-none ${startAt ? 'min-w-[100px]' : 'w-[100px]'}`}
           >
-            {submitting ? 'Scheduling…' : startAt ? 'Send Later' : 'Send'}
-          </Button>
-          {showSendLater && (
-            <SendLaterPopover startAt={startAt} onPick={setStartAt} onClose={() => setShowSendLater(false)} />
-          )}
-        </div>
-      </div>
-
-      {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
-
-      <div>
-        <FieldRow label="From" divider={false}>
-          <select className={fieldClass} value={senderId} onChange={(e) => setSenderId(e.target.value)} required>
-            {senders.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.email}
-              </option>
-            ))}
-          </select>
-        </FieldRow>
-
-        <FieldRow label="To">
-          <div className="flex flex-wrap items-center gap-2">
-            {visibleChips.map((email) => (
-              <span key={email} className="rounded-full border border-brand px-3 py-1 text-xs text-brand">
-                {email}
+            {submitting ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Spinner className="h-3.5 w-3.5 border-brand border-r-transparent" />
+                …
               </span>
-            ))}
-            {overflowCount > 0 && (
-              <span className="rounded-full border border-brand px-3 py-1 text-xs text-brand">+{overflowCount}</span>
+            ) : startAt ? (
+              'Send Later'
+            ) : (
+              'Send'
             )}
-            <input
-              type="text"
-              className={`${fieldClass} min-w-[160px] flex-1 py-1`}
-              value={recipientDraft}
-              onChange={(e) => handleRecipientDraftChange(e.target.value)}
-              onKeyDown={handleRecipientKeyDown}
-              onBlur={() => addRecipients(recipientDraft) && setRecipientDraft('')}
-              placeholder={recipients.length === 0 ? 'recipient@example.com' : ''}
-            />
-            <label className="flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap text-xs font-medium text-brand">
-              <UploadIcon />
-              Upload List
-              <input type="file" accept=".csv,.txt" onChange={(e) => handleFile(e.target.files?.[0])} className="hidden" />
-            </label>
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Subject">
-          <input className={fieldClass} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={191} />
-        </FieldRow>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-3 px-4 py-3.5 text-sm text-ink sm:gap-x-3">
-          <span>Delay between 2 emails</span>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            className="w-14 rounded-md border border-border px-2 py-1 text-sm text-ink focus:border-brand focus:outline-none"
-            value={delaySeconds}
-            onChange={(e) => setDelaySeconds(e.target.value)}
-          />
-          <span className="ml-4">Hourly Limit</span>
-          <input
-            type="number"
-            min={1}
-            placeholder="00"
-            className="w-14 rounded-md border border-border px-2 py-1 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
-            value={hourlyLimit}
-            onChange={(e) => setHourlyLimit(e.target.value)}
-          />
+          </Button>
         </div>
       </div>
 
-      <MessageEditor value={body} onChange={setBody} placeholder="Type Your Reply…" />
+      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 px-4 pt-4 pb-6 sm:px-6">
+        {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
 
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {attachments.map((file, i) => (
-            <div key={`${file.name}-${i}`} className="relative h-20 w-28 overflow-hidden rounded-lg">
-              <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={() => setAttachments((current) => current.filter((_, idx) => idx !== i))}
-                aria-label={`Remove ${file.name}`}
-                className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink/60 text-[10px] text-white"
+        <div className="flex w-full flex-col gap-4">
+          <FieldRow label="From" divider={false}>
+            {sendersLoading ? (
+              <span className="flex items-center gap-2 text-sm text-muted">
+                <Spinner />
+                Loading senders…
+              </span>
+            ) : (
+              <div className="relative inline-flex items-center rounded-lg bg-surface py-2 pl-2.5 pr-8">
+                <select
+                  className="appearance-none bg-transparent text-base leading-[120%] text-ink focus:outline-none"
+                  value={senderId}
+                  onChange={(e) => setSenderId(e.target.value)}
+                  required
+                >
+                  {senders.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.email}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="pointer-events-none absolute right-2.5 text-icon" />
+              </div>
+            )}
+          </FieldRow>
+
+          <FieldRow label="To">
+            <div className="flex w-full items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                {visibleChips.map((email) => (
+                  <span key={email} className="rounded-full border border-brand px-3 py-1 text-xs text-brand">
+                    {email}
+                  </span>
+                ))}
+                {overflowCount > 0 && (
+                  <span className="rounded-full border border-brand px-3 py-1 text-xs text-brand">+{overflowCount}</span>
+                )}
+                <input
+                  type="text"
+                  className={`${fieldClass} min-w-[120px] flex-1`}
+                  value={recipientDraft}
+                  onChange={(e) => handleRecipientDraftChange(e.target.value)}
+                  onKeyDown={handleRecipientKeyDown}
+                  onBlur={() => addRecipients(recipientDraft) && setRecipientDraft('')}
+                  placeholder={recipients.length === 0 ? 'recipient@example.com' : ''}
+                />
+              </div>
+              <label
+                className={`ml-auto flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap text-xs font-medium ${loadingList ? 'text-muted' : 'text-brand'}`}
               >
-                ×
-              </button>
+                {loadingList ? <Spinner className="h-3.5 w-3.5" /> : <UploadIcon />}
+                Upload List
+                <input
+                  ref={listInputRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  disabled={loadingList}
+                  onChange={(e) => void handleListUpload(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
             </div>
-          ))}
+          </FieldRow>
+
+          <FieldRow label="Subject">
+            <input
+              className={fieldClass}
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Subject"
+              required
+              maxLength={191}
+            />
+          </FieldRow>
+
+          <div className="flex min-h-[39px] flex-wrap items-center gap-x-2 gap-y-3 text-sm text-ink sm:gap-x-3">
+            <span>Delay between 2 emails</span>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              placeholder="00"
+              className="w-[70px] rounded-lg border border-border px-2.5 py-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
+              value={delaySeconds}
+              onChange={(e) => setDelaySeconds(e.target.value)}
+            />
+            <span className="ml-4">Hourly Limit</span>
+            <input
+              type="number"
+              min={1}
+              placeholder="00"
+              className="w-[70px] rounded-lg border border-border px-2.5 py-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
+              value={hourlyLimit}
+              onChange={(e) => setHourlyLimit(e.target.value)}
+            />
+          </div>
         </div>
-      )}
+
+        <MessageEditor value={body} onChange={setBody} placeholder="Type Your Reply…" />
+
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {attachments.map((file, i) => (
+              <div
+                key={`${file.name}-${i}`}
+                className="relative h-[169px] w-[210px] shrink-0 overflow-hidden rounded-[10px] border border-border"
+              >
+                <button
+                  type="button"
+                  onClick={() => setPreview({ src: attachmentUrls[i], alt: file.name })}
+                  className="block h-full w-full"
+                  aria-label={`Preview ${file.name}`}
+                >
+                  <img src={attachmentUrls[i]} alt={file.name} className="h-full w-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttachments((current) => current.filter((_, idx) => idx !== i))}
+                  aria-label={`Remove ${file.name}`}
+                  className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-xs text-white hover:bg-ink/80"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {preview && <ImagePreviewModal src={preview.src} alt={preview.alt} onClose={() => setPreview(null)} />}
     </form>
   );
 }

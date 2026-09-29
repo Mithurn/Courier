@@ -60,23 +60,23 @@ export function MessageEditor({ value, onChange, placeholder }: Props) {
   }
 
   return (
-    <div className="flex max-h-[475px] flex-col gap-[22px] rounded-[10px] bg-surface-soft p-4">
+    <div className="flex w-full max-h-[475px] flex-col gap-[22px] rounded-[10px] bg-surface-soft p-4">
       <div
         ref={ref}
         contentEditable
         suppressContentEditableWarning
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
         data-placeholder={placeholder}
-        className="min-h-[140px] flex-1 overflow-y-auto text-sm text-ink outline-none empty:before:text-muted empty:before:content-[attr(data-placeholder)]"
+        className="min-h-[140px] flex-1 overflow-y-auto text-base leading-[118%] tracking-[-0.5px] text-ink outline-none empty:before:text-muted empty:before:content-[attr(data-placeholder)]"
       />
-      <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-full bg-white px-2 py-1.5 shadow-sm">
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-4 rounded-full bg-white px-3 py-1.5 shadow-sm">
         <ToolbarButton label="Undo" onClick={() => exec('undo')}>
           <UndoIcon />
         </ToolbarButton>
         <ToolbarButton label="Redo" onClick={() => exec('redo')}>
           <RedoIcon />
         </ToolbarButton>
-        <span className="mx-1 h-4 w-px bg-divider" />
+        <span className="h-4 w-px bg-divider" />
         <div className="relative flex items-center">
           <select
             aria-label="Text style"
@@ -93,7 +93,7 @@ export function MessageEditor({ value, onChange, placeholder }: Props) {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute right-0 text-icon" />
         </div>
-        <span className="mx-1 h-4 w-px bg-divider" />
+        <span className="h-4 w-px bg-divider" />
         <ToolbarButton label="Bold" onClick={() => exec('bold')}>
           <BoldIcon />
         </ToolbarButton>
@@ -103,7 +103,7 @@ export function MessageEditor({ value, onChange, placeholder }: Props) {
         <ToolbarButton label="Underline" onClick={() => exec('underline')}>
           <UnderlineIcon />
         </ToolbarButton>
-        <span className="mx-1 h-4 w-px bg-divider" />
+        <span className="h-4 w-px bg-divider" />
         <ToolbarButton label="Align left" onClick={() => exec('justifyLeft')}>
           <AlignLeftIcon />
         </ToolbarButton>
@@ -113,7 +113,7 @@ export function MessageEditor({ value, onChange, placeholder }: Props) {
         <ToolbarButton label="Align right" onClick={() => exec('justifyRight')}>
           <AlignRightIcon />
         </ToolbarButton>
-        <span className="mx-1 h-4 w-px bg-divider" />
+        <span className="h-4 w-px bg-divider" />
         <ToolbarButton label="Numbered list" onClick={() => exec('insertOrderedList')}>
           <OrderedListIcon />
         </ToolbarButton>
@@ -126,7 +126,7 @@ export function MessageEditor({ value, onChange, placeholder }: Props) {
         <ToolbarButton label="Outdent" onClick={() => exec('outdent')}>
           <OutdentIcon />
         </ToolbarButton>
-        <span className="mx-1 h-4 w-px bg-divider" />
+        <span className="h-4 w-px bg-divider" />
         <ToolbarButton label="Quote" onClick={() => exec('formatBlock', 'blockquote')}>
           <QuoteIcon />
         </ToolbarButton>
