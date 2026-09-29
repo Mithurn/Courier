@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import DOMPurify from 'dompurify';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -7,10 +8,10 @@ import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { RecipientLabel } from '../components/RecipientLabel';
 import { ErrorBanner, Spinner } from '../components/ui';
 import { ArchiveIcon, BackIcon, StarIcon, TrashIcon } from '../components/icons';
+import { formatDateTime, formatFileSize } from '../lib/format';
 import type { EmailDetail } from '../types';
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const formatTime = (iso: string) => formatDateTime(iso, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 function displayNameFromEmail(email: string) {
   return email
@@ -19,14 +20,23 @@ function displayNameFromEmail(email: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+/** Base64 data URLs carry no size metadata — decoded byte length approximates it (3/4 of the base64 string, minus padding). */
+function dataUrlSize(src: string) {
+  const base64 = src.slice(src.indexOf(',') + 1);
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.round((base64.length * 3) / 4) - padding;
+}
+
 function parseEmailBody(html: string) {
-  const attachments: { src: string; alt: string }[] = [];
-  const body = html.replace(/<img\b[^>]*>/gi, (tag) => {
+  const attachments: { src: string; alt: string; size: number }[] = [];
+  const stripped = html.replace(/<img\b[^>]*>/gi, (tag) => {
     const src = tag.match(/\bsrc="([^"]+)"/i)?.[1];
     const alt = tag.match(/\balt="([^"]*)"/i)?.[1] || 'attachment';
-    if (src) attachments.push({ src, alt });
+    if (src) attachments.push({ src, alt, size: dataUrlSize(src) });
     return '';
   });
+  // Email bodies are freeform HTML from the composer (or the raw API) — never trust it unsanitized.
+  const body = DOMPurify.sanitize(stripped);
   return { body, attachments };
 }
 
@@ -47,6 +57,39 @@ export function EmailDetailPage() {
   async function disconnectSlack() {
     await api.slackDisconnect();
     setSlack({ connected: false, teamName: null });
+  }
+
+  async function toggleStar() {
+    if (!email) return;
+    const starred = !email.starred;
+    setEmail({ ...email, starred });
+    try {
+      await api.updateFlags(email.id, { starred });
+    } catch (err) {
+      setError((err as Error).message);
+      setEmail((e) => (e ? { ...e, starred: !starred } : e));
+    }
+  }
+
+  async function toggleArchive() {
+    if (!email) return;
+    const archived = !email.archived;
+    try {
+      await api.updateFlags(email.id, { archived });
+      navigate(-1);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function moveToTrash() {
+    if (!email) return;
+    try {
+      await api.updateFlags(email.id, { trashed: true });
+      navigate(-1);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   useEffect(() => {
@@ -79,7 +122,7 @@ export function EmailDetailPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col">
+    <div className="flex min-h-screen w-full flex-col gap-5">
       <div className="flex w-full shrink-0 items-center justify-between gap-2.5 px-4 pt-5 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
           <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="shrink-0 cursor-pointer rounded-full p-1 text-ink hover:bg-surface">
@@ -88,15 +131,36 @@ export function EmailDetailPage() {
           <h1 className="truncate text-2xl leading-[30px] tracking-[0.07px] text-ink">{email?.subject ?? 'Email'}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-4 text-icon">
-          <button type="button" aria-label="Star" className="cursor-pointer hover:text-ink">
-            <StarIcon />
+          <button
+            type="button"
+            aria-label={email?.starred ? 'Unstar' : 'Star'}
+            aria-pressed={email?.starred}
+            onClick={toggleStar}
+            disabled={!email}
+            className={`cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${email?.starred ? 'text-brand' : 'hover:text-ink'}`}
+          >
+            <StarIcon className={email?.starred ? 'fill-current' : undefined} />
           </button>
-          <button type="button" aria-label="Archive" className="cursor-pointer hover:text-ink">
+          <button
+            type="button"
+            aria-label={email?.archived ? 'Unarchive' : 'Archive'}
+            aria-pressed={email?.archived}
+            onClick={toggleArchive}
+            disabled={!email}
+            className={`cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${email?.archived ? 'text-brand' : 'hover:text-ink'}`}
+          >
             <ArchiveIcon />
           </button>
-          <button type="button" aria-label="Delete" className="cursor-pointer hover:text-ink">
+          <button
+            type="button"
+            aria-label="Delete"
+            onClick={moveToTrash}
+            disabled={!email}
+            className="cursor-pointer hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
             <TrashIcon />
           </button>
+          <span className="h-5 w-px shrink-0 bg-divider" />
           {user && (
             <AccountMenu
               user={user}
@@ -150,16 +214,19 @@ export function EmailDetailPage() {
               {parsed.attachments.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-3 pb-2">
                   {parsed.attachments.map((file) => (
-                    <div key={file.src} className="w-[210px] shrink-0 overflow-hidden rounded-[10px]">
+                    <div key={file.src} className="w-[210px] shrink-0 overflow-hidden rounded-[10px] border border-border">
                       <button
                         type="button"
                         onClick={() => setPreview(file)}
-                        className="block w-full cursor-pointer"
+                        className="block h-[117px] w-full cursor-pointer"
                         aria-label={`Preview ${file.alt}`}
                       >
-                        <img src={file.src} alt={file.alt} className="h-[117px] w-full object-cover" />
+                        <img src={file.src} alt={file.alt} className="h-full w-full object-cover" />
                       </button>
-                      <p className="mt-2 truncate text-sm text-ink">{file.alt}</p>
+                      <div className="flex flex-col gap-0.5 border-t border-divider bg-surface-soft px-2.5 py-2">
+                        <p className="truncate text-sm font-medium leading-5 tracking-[-0.15px] text-ink">{file.alt}</p>
+                        <p className="text-xs leading-4 text-muted">{formatFileSize(file.size)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -27,8 +27,10 @@ export function RecipientLabel({ toEmail, viewerEmail }: { toEmail: string; view
         <ChevronDownIcon />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm">
-          {toEmail}
+        <div className="absolute left-0 top-full z-10 mt-2 min-w-[200px] rounded-lg border border-border bg-white px-3.5 py-2.5 shadow-lg">
+          <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 border-l border-t border-border bg-white" />
+          <p className="text-xs text-muted">To</p>
+          <p className="text-sm text-ink">{toEmail}</p>
         </div>
       )}
     </div>
