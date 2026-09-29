@@ -10,7 +10,7 @@ export async function requeueScheduledEmails(): Promise<number> {
 
   for (;;) {
     const rows = await prisma.scheduledEmail.findMany({
-      where: { status: 'scheduled' },
+      where: { status: 'scheduled', trashed: false },
       select: { id: true, scheduledAt: true },
       orderBy: { id: 'asc' },
       take: BATCH_SIZE,

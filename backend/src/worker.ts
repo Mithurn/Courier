@@ -40,9 +40,9 @@ const worker = new Worker<EmailJobData>(
       return { skipped: true, reason: 'not_found' };
     }
 
-    if (email.status !== 'scheduled') {
-      await job.log(`Email status is already '${email.status}'; idempotent no-op.`);
-      return { skipped: true, status: email.status };
+    if (email.status !== 'scheduled' || email.trashed) {
+      await job.log(`Email status is '${email.status}', trashed: ${email.trashed}; skipping.`);
+      return { skipped: true, status: email.status, trashed: email.trashed };
     }
 
     await job.updateProgress(15);
