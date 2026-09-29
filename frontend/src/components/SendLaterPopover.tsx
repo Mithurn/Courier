@@ -2,16 +2,11 @@ import { useState } from 'react';
 import { CalendarIcon } from './icons';
 
 const SEND_LATER_PRESETS = [
-  { label: 'In 2 minutes (Restart test)', minutesAhead: 2 },
   { label: 'Tomorrow', hour: 9 },
   { label: 'Tomorrow, 10:00 AM', hour: 10 },
   { label: 'Tomorrow, 11:00 AM', hour: 11 },
   { label: 'Tomorrow, 3:00 PM', hour: 15 },
 ];
-
-function minutesFromNow(minutes: number) {
-  return new Date(Date.now() + minutes * 60 * 1000);
-}
 
 function tomorrowAt(hour: number) {
   const d = new Date();
@@ -45,7 +40,7 @@ export function SendLaterPopover({
   onPick: (iso: string) => void;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState(() => startAt || toLocalInputValue(minutesFromNow(2)));
+  const [draft, setDraft] = useState(startAt);
 
   return (
     <div className="absolute right-0 top-full z-20 mt-2 flex h-[364px] w-[318px] max-w-[calc(100vw-2rem)] flex-col rounded-[10px] border border-border bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
@@ -70,9 +65,7 @@ export function SendLaterPopover({
             <button
               type="button"
               className="cursor-pointer text-left text-sm text-muted hover:text-ink"
-              onClick={() =>
-                setDraft(toLocalInputValue(preset.minutesAhead ? minutesFromNow(preset.minutesAhead) : tomorrowAt(preset.hour!)))
-              }
+              onClick={() => setDraft(toLocalInputValue(tomorrowAt(preset.hour)))}
             >
               {preset.label}
             </button>
