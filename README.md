@@ -4,7 +4,24 @@ Email scheduler and dashboard. Schedules emails with BullMQ delayed jobs (no cro
 
 Stack: TypeScript, Express 5, BullMQ + Redis, MySQL + Prisma, Elasticsearch, Ethereal SMTP. The React + Tailwind frontend lives in `frontend/`.
 
-## Run the backend
+## Quick start (single command)
+
+Requires Docker and Node 20+. Starts backing services (MySQL, Redis, Elasticsearch), runs database migrations, and launches the backend API, BullMQ worker, and frontend concurrently:
+
+```bash
+./run-local.sh
+```
+
+- Frontend: `http://localhost:5173`
+- Bull Board: `http://localhost:4000/admin/queues`
+- API Docs: `http://localhost:4000/docs`
+- Health: `http://localhost:4000/health`
+
+---
+
+## Run manually (step by step)
+
+### 1. Run the backend
 
 Requires Node 22 and Docker.
 
