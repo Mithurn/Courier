@@ -72,7 +72,21 @@ export const DEV_SENT: EmailListItem[] = [
 
 export const DEV_DETAIL: EmailDetail = {
   ...DEV_SCHEDULED[0],
-  body: '<p>Hi Alice,</p><p>Thanks for signing up. This is sample email body content for local UI review.</p>',
+  subject: 'Oliver, hello there! | MJWYT44 BM#52W01',
+  from: 'sender@example.com',
+  toEmail: 'dev@example.com',
+  sentAt: '2025-11-03T10:23:00.000Z',
+  status: 'sent',
+  body: `<p>Hey Oliver,</p>
+<p>You've just <strong>RECEIVED</strong> something</p>
+<div style="background:#FEFCE8;border-left:4px solid #FDC700;padding:16px 16px 16px 20px;margin:0 0 16px;">
+<p style="margin:0 0 8px;">⚡ <strong>Extremely Exclusive—Only 4 Spots Worldwide Per Year | $25,000 investment</strong> ⚡</p>
+<p style="margin:0;">⚡ To explore securing your private transformation, simply reply right now with <strong>"FLY OUT FIX"</strong>.</p>
+</div>
+<p>Your coach for world-class performance,<br/>Grant</p>
+<p><em>P.S. Always remember that you can develop world class technique! 🚀</em></p>
+<img src="https://images.unsplash.com/photo-1595435934249-5df7f325bbad?w=420&h=234&fit=crop" alt="Tennis_Coach_Profile.png" />
+<img src="https://images.unsplash.com/photo-1622163642999-958049106b47?w=420&h=234&fit=crop" alt="Tennis_Coach_Profile2.png" />`,
 };
 
 export function devPage<T>(items: T[]): Page<T> {
