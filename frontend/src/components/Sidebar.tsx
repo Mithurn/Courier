@@ -2,15 +2,7 @@ import { NavLink } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import type { Counts, User } from '../types';
 import { AccountMenu } from './AccountMenu';
-
-function ClockIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M8 4.5V8l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
+import { ScheduledClockIcon } from './icons';
 
 function SentIcon() {
   return (
@@ -49,7 +41,7 @@ function NavItem({
       end={end}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex h-9 items-center justify-between rounded-xl px-4 text-sm ${isActive ? 'bg-brand-soft font-medium text-ink' : 'text-muted'}`
+        `flex h-9 cursor-pointer items-center justify-between rounded-xl px-4 text-sm ${isActive ? 'bg-brand-soft font-medium text-ink' : 'text-muted'}`
       }
     >
       <span className="flex items-center gap-2">
@@ -93,7 +85,7 @@ export function Sidebar({ user, counts, senderReady, slack, open, onDisconnectSl
               <button
                 type="button"
                 onClick={onClick}
-                className="flex h-14 w-full items-center justify-between rounded-2xl bg-surface px-3 py-2.5 text-left"
+                className="flex h-14 w-full cursor-pointer items-center justify-between rounded-2xl bg-surface px-3 py-2.5 text-left"
               >
                 <span className="flex items-center gap-2 overflow-hidden">
                   {user.avatarUrl && (
@@ -119,7 +111,7 @@ export function Sidebar({ user, counts, senderReady, slack, open, onDisconnectSl
             }}
             aria-disabled={!senderReady}
             className={`flex h-9 w-full items-center justify-center rounded-full border border-brand text-sm font-medium text-brand ${
-              senderReady ? '' : 'cursor-not-allowed opacity-50'
+              senderReady ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
             }`}
           >
             Compose
@@ -128,7 +120,14 @@ export function Sidebar({ user, counts, senderReady, slack, open, onDisconnectSl
 
         <nav className="flex flex-1 flex-col gap-1">
           <span className="px-4 pb-1 pt-3 text-xs font-medium tracking-wide text-muted">CORE</span>
-          <NavItem to="/dashboard" end icon={<ClockIcon />} label="Scheduled" count={counts.scheduled} onClick={onClose} />
+          <NavItem
+            to="/dashboard"
+            end
+            icon={<ScheduledClockIcon active={counts.scheduled > 0} />}
+            label="Scheduled"
+            count={counts.scheduled}
+            onClick={onClose}
+          />
           <NavItem to="/dashboard/sent" icon={<SentIcon />} label="Sent" count={counts.sent} onClick={onClose} />
         </nav>
       </aside>

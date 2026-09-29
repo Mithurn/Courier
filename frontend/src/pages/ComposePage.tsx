@@ -8,6 +8,8 @@ import { AttachmentIcon, BackIcon, CalendarIcon, ChevronDownIcon, ClockIcon, Upl
 import { MessageEditor } from '../components/MessageEditor';
 
 const mockFixtures = import.meta.env.DEV && import.meta.env.VITE_DEV_FIXTURES === 'true';
+const MAX_EMAIL_BODY_LENGTH = 900_000;
+const MAX_ATTACHMENT_BYTES = 120_000;
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
 const extractEmails = (text: string) => [...new Set((text.match(EMAIL_PATTERN) ?? []).map((e) => e.toLowerCase()))];
@@ -21,6 +23,43 @@ const fileToDataUrl = (file: File) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+function canvasToJpeg(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('Could not compress image.'))), 'image/jpeg', quality),
+  );
+}
+
+async function prepareImageAttachment(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file).catch(() => {
+    throw new Error(`${file.name}: use JPG or PNG. HEIC is not supported in the browser.`);
+  });
+
+  try {
+    let maxDim = 1024;
+    while (maxDim >= 320) {
+      const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not process image.');
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      for (let quality = 0.82; quality >= 0.45; quality -= 0.08) {
+        const blob = await canvasToJpeg(canvas, quality);
+        if (blob.size <= MAX_ATTACHMENT_BYTES) {
+          const base = file.name.replace(/\.[^.]+$/, '') || 'image';
+          return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+        }
+      }
+      maxDim = Math.round(maxDim * 0.75);
+    }
+    throw new Error(`${file.name} is too large. Try a smaller image.`);
+  } finally {
+    bitmap.close();
+  }
+}
 
 function FieldRow({ label, divider = true, children }: { label: string; divider?: boolean; children: ReactNode }) {
   return (
@@ -96,7 +135,7 @@ function SendLaterPopover({
           <li key={preset.label}>
             <button
               type="button"
-              className="text-left text-sm text-muted hover:text-ink"
+              className="cursor-pointer text-left text-sm text-muted hover:text-ink"
               onClick={() => setDraft(toLocalInputValue(tomorrowAt(preset.hour)))}
             >
               {preset.label}
@@ -106,12 +145,12 @@ function SendLaterPopover({
       </ul>
 
       <div className="mt-auto flex justify-end gap-4 pt-4 text-sm">
-        <button type="button" className="font-medium text-ink" onClick={onClose}>
+        <button type="button" className="cursor-pointer font-medium text-ink" onClick={onClose}>
           Cancel
         </button>
         <button
           type="button"
-          className="rounded-full border border-brand px-4 py-1 font-medium text-brand hover:bg-brand-soft"
+          className="cursor-pointer rounded-full border border-brand px-4 py-1 font-medium text-brand hover:bg-brand-soft"
           onClick={() => {
             onPick(draft);
             onClose();
@@ -204,7 +243,10 @@ export function ComposePage() {
     setLoadingAttachments(true);
     setError('');
     try {
-      setAttachments((current) => [...current, ...Array.from(files)]);
+      const prepared = await Promise.all(Array.from(files).map(prepareImageAttachment));
+      setAttachments((current) => [...current, ...prepared]);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setLoadingAttachments(false);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';
@@ -219,10 +261,14 @@ export function ComposePage() {
       const attachmentHtml = (
         await Promise.all(attachments.map(async (file) => `<p><img src="${await fileToDataUrl(file)}" alt="${file.name}" /></p>`))
       ).join('');
+      const fullBody = body + attachmentHtml;
+      if (fullBody.length > MAX_EMAIL_BODY_LENGTH) {
+        throw new Error('Email body is too large. Remove or shrink image attachments.');
+      }
       const result = await api.schedule({
         senderId,
         subject,
-        body: body + attachmentHtml,
+        body: fullBody,
         recipients,
         startAt: startAt ? new Date(startAt).toISOString() : undefined,
         delayBetweenSendsMs: delaySeconds ? Math.round(Number(delaySeconds) * 1000) : undefined,
@@ -236,7 +282,11 @@ export function ComposePage() {
     }
   }
 
-  const canSend = Boolean(senderId) && recipients.length > 0 && !isBodyEmpty(body) && subject.trim().length > 0;
+  const canSend =
+    Boolean(senderId) &&
+    recipients.length > 0 &&
+    subject.trim().length > 0 &&
+    (!isBodyEmpty(body) || attachments.length > 0);
 
   if (user === undefined) {
     return (
@@ -251,41 +301,39 @@ export function ComposePage() {
     <form onSubmit={handleSubmit} className="flex w-full flex-col">
       <div className="flex w-full items-center justify-between gap-5 px-4 pt-5 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
+          <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="cursor-pointer rounded-full p-1 text-ink hover:bg-surface">
             <BackIcon />
           </button>
           <h1 className="truncate text-xl text-ink sm:text-2xl">Compose New Email</h1>
         </div>
         <div className="relative flex h-[34px] shrink-0 items-center gap-[10px]">
-          <button
-            type="button"
-            onClick={() => attachmentInputRef.current?.click()}
-            disabled={loadingAttachments}
-            aria-label="Attach image"
-            className={`relative flex h-6 w-6 items-center justify-center ${hasAttachments ? 'text-brand' : 'text-icon'} hover:text-ink disabled:opacity-60`}
+          <label
+            className={`relative flex h-6 w-6 cursor-pointer items-center justify-center ${hasAttachments ? 'text-brand' : 'text-icon'} hover:text-ink ${loadingAttachments ? 'pointer-events-none opacity-60' : ''}`}
           >
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+              multiple
+              className="sr-only"
+              disabled={loadingAttachments}
+              aria-label="Attach image"
+              onChange={(e) => void handleAttachmentPick(e.target.files)}
+            />
             {loadingAttachments ? <Spinner className="h-4 w-4" /> : <AttachmentIcon />}
             {hasAttachments && !loadingAttachments && (
               <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">
                 {attachments.length}
               </span>
             )}
-          </button>
-          <input
-            ref={attachmentInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => void handleAttachmentPick(e.target.files)}
-          />
+          </label>
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowSendLater((v) => !v)}
               aria-label="Send later"
               aria-expanded={showSendLater}
-              className={`flex h-6 w-6 items-center justify-center ${hasSchedule ? 'text-brand' : 'text-icon'} hover:text-ink`}
+              className={`flex h-6 w-6 cursor-pointer items-center justify-center ${hasSchedule ? 'text-brand' : 'text-icon'} hover:text-ink`}
             >
               <ClockIcon className="h-4 w-4" />
             </button>
@@ -426,7 +474,7 @@ export function ComposePage() {
                 <button
                   type="button"
                   onClick={() => setPreview({ src: attachmentUrls[i], alt: file.name })}
-                  className="block h-full w-full"
+                  className="block h-full w-full cursor-pointer"
                   aria-label={`Preview ${file.name}`}
                 >
                   <img src={attachmentUrls[i]} alt={file.name} className="h-full w-full object-cover" />
@@ -435,7 +483,7 @@ export function ComposePage() {
                   type="button"
                   onClick={() => setAttachments((current) => current.filter((_, idx) => idx !== i))}
                   aria-label={`Remove ${file.name}`}
-                  className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-xs text-white hover:bg-ink/80"
+                  className="absolute right-2 top-2 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-ink/60 text-xs text-white hover:bg-ink/80"
                 >
                   ×
                 </button>

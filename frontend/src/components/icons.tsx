@@ -48,6 +48,17 @@ export function ClockIcon({ className = '' }: IconProps) {
   );
 }
 
+export function ScheduledClockIcon({ active = false, className = '' }: IconProps & { active?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+      <g className={active ? 'origin-[8px_8px] animate-clock-tick' : undefined}>
+        <path d="M8 4.5V8l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
 export function BackIcon({ className = '' }: IconProps) {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
@@ -280,6 +291,43 @@ export function QuoteIcon({ className = '' }: IconProps) {
         d="M3 5.5c0-1.2 1-2 2.2-2M3 5.5v2.3h2.2V5.5M9 5.5c0-1.2 1-2 2.2-2M9 5.5v2.3h2.2V5.5"
         stroke="currentColor"
         strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function SlackIcon({ className = '' }: IconProps) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M6.6 9.4a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 0 1 2.8 0ZM3.8 9.4a1.4 1.4 0 0 1 1.4-1.4h1.4V6.6a1.4 1.4 0 1 1 2.8 0v1.4h1.4a1.4 1.4 0 0 1 0 2.8H9.4v1.4a1.4 1.4 0 1 1-2.8 0V9.4H5.2Z"
+        fill="#611F69"
+      />
+      <path
+        d="M9.4 6.6a1.4 1.4 0 1 1 2.8 0 1.4 1.4 0 0 1-2.8 0ZM12.2 6.6a1.4 1.4 0 0 1-1.4 1.4h-1.4v1.4a1.4 1.4 0 1 1-2.8 0V8H5.2a1.4 1.4 0 0 1 0-2.8h1.4V3.8a1.4 1.4 0 1 1 2.8 0v1.4h1.4a1.4 1.4 0 0 1 1.4 1.4Z"
+        fill="#E01E5A"
+      />
+      <path
+        d="M6.6 6.6a1.4 1.4 0 1 1-2.8 0 1.4 1.4 0 0 1 2.8 0ZM3.8 6.6a1.4 1.4 0 0 1 1.4-1.4h1.4V3.8a1.4 1.4 0 1 1 2.8 0v1.4h1.4a1.4 1.4 0 0 1 0 2.8H9.4v1.4a1.4 1.4 0 1 1-2.8 0V6.6H5.2Z"
+        fill="#36C5F0"
+      />
+      <path
+        d="M9.4 9.4a1.4 1.4 0 1 1 2.8 0 1.4 1.4 0 0 1-2.8 0ZM12.2 9.4a1.4 1.4 0 0 1-1.4-1.4h-1.4V6.6a1.4 1.4 0 1 1 2.8 0v1.4h1.4a1.4 1.4 0 0 1 0 2.8H9.4v1.4a1.4 1.4 0 1 1-2.8 0V9.4h1.4Z"
+        fill="#2EB67D"
+      />
+    </svg>
+  );
+}
+
+export function LogoutIcon({ className = '' }: IconProps) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M6 14H3.5A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H6M10 11l3-3-3-3M13 8H6"
+        stroke="currentColor"
+        strokeWidth="1.3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

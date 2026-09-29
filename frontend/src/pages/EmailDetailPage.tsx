@@ -82,19 +82,19 @@ export function EmailDetailPage() {
     <div className="flex min-h-screen w-full flex-col">
       <div className="flex w-full shrink-0 items-center justify-between gap-2.5 px-4 pt-5 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
-          <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="shrink-0 rounded-full p-1 text-ink hover:bg-surface">
+          <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="shrink-0 cursor-pointer rounded-full p-1 text-ink hover:bg-surface">
             <BackIcon />
           </button>
           <h1 className="truncate text-2xl leading-[30px] tracking-[0.07px] text-ink">{email?.subject ?? 'Email'}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-4 text-icon">
-          <button type="button" aria-label="Star" className="hover:text-ink">
+          <button type="button" aria-label="Star" className="cursor-pointer hover:text-ink">
             <StarIcon />
           </button>
-          <button type="button" aria-label="Archive" className="hover:text-ink">
+          <button type="button" aria-label="Archive" className="cursor-pointer hover:text-ink">
             <ArchiveIcon />
           </button>
-          <button type="button" aria-label="Delete" className="hover:text-ink">
+          <button type="button" aria-label="Delete" className="cursor-pointer hover:text-ink">
             <TrashIcon />
           </button>
           {user && (
@@ -104,7 +104,7 @@ export function EmailDetailPage() {
               onDisconnectSlack={disconnectSlack}
               align="right"
               trigger={({ onClick }) => (
-                <button type="button" onClick={onClick} aria-label="Account menu" className="shrink-0 rounded-full">
+                <button type="button" onClick={onClick} aria-label="Account menu" className="shrink-0 cursor-pointer rounded-full">
                   {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
                   ) : (
@@ -142,7 +142,7 @@ export function EmailDetailPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div
-                className="text-base leading-[26px] tracking-[-0.31px] text-ink [&_p]:mb-4 [&_p:last-child]:mb-0"
+                className="text-base leading-[26px] tracking-[-0.31px] text-ink [&_img]:cursor-pointer [&_p]:mb-4 [&_p:last-child]:mb-0"
                 dangerouslySetInnerHTML={{ __html: parsed.body }}
                 onClick={handleBodyClick}
               />
@@ -154,7 +154,7 @@ export function EmailDetailPage() {
                       <button
                         type="button"
                         onClick={() => setPreview(file)}
-                        className="block w-full"
+                        className="block w-full cursor-pointer"
                         aria-label={`Preview ${file.alt}`}
                       >
                         <img src={file.src} alt={file.alt} className="h-[117px] w-full object-cover" />

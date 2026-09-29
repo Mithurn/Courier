@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../api';
 import type { DashboardOutletContext } from '../components/DashboardLayout';
@@ -8,13 +8,19 @@ import { FilterIcon, RefreshIcon, SearchIcon } from '../components/icons';
 import type { EmailListItem, Page } from '../types';
 
 type Tab = 'scheduled' | 'sent';
-type StatusFilter = 'all' | 'sent' | 'failed';
+type StatusFilter = 'all' | 'scheduled' | 'sending' | 'sent' | 'failed';
 const PAGE_SIZE = 10;
+
+const FILTER_OPTIONS: Record<Tab, readonly StatusFilter[]> = {
+  scheduled: ['all', 'scheduled', 'sending'],
+  sent: ['all', 'sent', 'failed'],
+};
 
 export function EmailListPage({ tab }: { tab: Tab }) {
   const { setCounts } = useOutletContext<DashboardOutletContext>();
   const navigate = useNavigate();
   const location = useLocation();
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
@@ -25,14 +31,29 @@ export function EmailListPage({ tab }: { tab: Tab }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
 
+  useEffect(() => {
+    setStatusFilter('all');
+    setPage(1);
+    setFilterOpen(false);
+  }, [tab]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      if (!filterRef.current?.contains(event.target as Node)) setFilterOpen(false);
+    }
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [filterOpen]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const list = query
         ? api.search(query, page)
         : tab === 'scheduled'
-          ? api.scheduled(page)
-          : api.sent(page, statusFilter === 'all' ? undefined : statusFilter);
+          ? api.scheduled(page, statusFilter === 'scheduled' || statusFilter === 'sending' ? statusFilter : undefined)
+          : api.sent(page, statusFilter === 'sent' || statusFilter === 'failed' ? statusFilter : undefined);
       const [items, nextCounts] = await Promise.all([list, api.counts()]);
       setData(items);
       setCounts(nextCounts);
@@ -69,18 +90,18 @@ export function EmailListPage({ tab }: { tab: Tab }) {
             className="w-full min-w-0 bg-transparent text-sm text-ink placeholder:text-icon focus:outline-none"
           />
         </div>
-        <div className="relative shrink-0">
+        <div ref={filterRef} className="relative shrink-0">
           <button
-            disabled={tab !== 'sent' || !!query}
-            title={tab === 'sent' ? 'Filter by status' : 'Filtering is only available on the Sent tab'}
+            disabled={!!query}
+            title="Filter by status"
             onClick={() => setFilterOpen((open) => !open)}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-icon hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-icon hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <FilterIcon />
           </button>
-          {filterOpen && tab === 'sent' && !query && (
+          {filterOpen && !query && (
             <div className="absolute right-0 top-10 z-10 w-36 overflow-hidden rounded-lg border border-border bg-white py-1 shadow-lg">
-              {(['all', 'sent', 'failed'] as const).map((option) => (
+              {FILTER_OPTIONS[tab].map((option) => (
                 <button
                   key={option}
                   onClick={() => {
@@ -88,7 +109,7 @@ export function EmailListPage({ tab }: { tab: Tab }) {
                     setStatusFilter(option);
                     setFilterOpen(false);
                   }}
-                  className={`block w-full px-4 py-2 text-left text-sm capitalize hover:bg-surface ${
+                  className={`block w-full cursor-pointer px-4 py-2 text-left text-sm capitalize hover:bg-surface ${
                     statusFilter === option ? 'font-semibold text-brand' : 'text-ink'
                   }`}
                 >
@@ -101,7 +122,7 @@ export function EmailListPage({ tab }: { tab: Tab }) {
         <button
           onClick={load}
           title="Refresh"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-icon hover:bg-surface"
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-icon hover:bg-surface"
         >
           <RefreshIcon />
         </button>

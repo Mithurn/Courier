@@ -22,8 +22,10 @@ export const api = {
   senders: () => (mock ? Promise.resolve(DEV_SENDERS) : request<Sender[]>('/senders')),
   createSender: () => (mock ? Promise.resolve(DEV_SENDERS[0]) : request<Sender>('/senders', { method: 'POST', body: '{}' })),
   counts: () => (mock ? Promise.resolve(DEV_COUNTS) : request<Counts>('/emails/counts')),
-  scheduled: (page: number) =>
-    mock ? Promise.resolve(devPage(DEV_SCHEDULED)) : request<Page<EmailListItem>>(`/emails/scheduled?page=${page}&pageSize=10`),
+  scheduled: (page: number, status?: 'scheduled' | 'sending') =>
+    mock
+      ? Promise.resolve(devPage(status ? DEV_SCHEDULED.filter((e) => e.status === status) : DEV_SCHEDULED))
+      : request<Page<EmailListItem>>(`/emails/scheduled?page=${page}&pageSize=10${status ? `&status=${status}` : ''}`),
   sent: (page: number, status?: 'sent' | 'failed') =>
     mock
       ? Promise.resolve(devPage(status ? DEV_SENT.filter((e) => e.status === status) : DEV_SENT))

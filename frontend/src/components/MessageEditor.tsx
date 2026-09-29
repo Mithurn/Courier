@@ -37,7 +37,7 @@ function ToolbarButton({ onClick, label, children }: { onClick: () => void; labe
       aria-label={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink hover:bg-surface"
+      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-ink hover:bg-surface"
     >
       {children}
     </button>

@@ -1,5 +1,5 @@
 import type { EmailListItem } from '../types';
-import { ClockIcon, StarIcon } from './icons';
+import { ScheduledClockIcon, StarIcon } from './icons';
 
 export const statusStyles: Record<string, string> = {
   scheduled: 'bg-pill-scheduled-bg border-pill-scheduled-border text-pill-scheduled-text',
@@ -51,7 +51,7 @@ export function EmailTable({ items, total, page, pageSize, loading, timeField, o
                 <span
                   className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusStyles[email.status]}`}
                 >
-                  {showTimeInPill && <ClockIcon />}
+                  {showTimeInPill && <ScheduledClockIcon active />}
                   {showTimeInPill ? time : statusLabels[email.status]}
                 </span>
                 <span className="min-w-0 truncate text-sm">

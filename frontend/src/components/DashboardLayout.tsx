@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import type { Counts } from '../types';
+import { SlackConnectPrompt } from './SlackConnectPrompt';
 import { Toast } from './ui';
 import { Sidebar } from './Sidebar';
 import { MenuIcon } from './icons';
+
+const slackPromptKey = (userId: string) => `slack-prompt-dismissed:${userId}`;
 
 export type DashboardOutletContext = {
   counts: Counts;
@@ -16,14 +19,61 @@ export function DashboardLayout() {
   const { user, senders } = useAuth();
   const [counts, setCounts] = useState<Counts>({ scheduled: 0, sent: 0 });
   const [slack, setSlack] = useState<{ connected: boolean; teamName: string | null }>({ connected: false, teamName: null });
+  const [slackLoaded, setSlackLoaded] = useState(false);
+  const [showSlackPrompt, setShowSlackPrompt] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const notice = searchParams.get('slack') === 'connected' ? 'Slack connected.' : '';
+  const isWelcome = searchParams.get('welcome') === '1';
+
+  const clearWelcomeParam = useCallback(() => {
+    setSearchParams((params) => {
+      params.delete('welcome');
+      return params;
+    });
+  }, [setSearchParams]);
 
   useEffect(() => {
-    api.slackStatus().then(setSlack).catch(() => undefined);
+    function refreshSlack() {
+      api
+        .slackStatus()
+        .then((status) => {
+          setSlack(status);
+          setSlackLoaded(true);
+        })
+        .catch(() => setSlackLoaded(true));
+    }
+    refreshSlack();
+    window.addEventListener('focus', refreshSlack);
+    return () => window.removeEventListener('focus', refreshSlack);
   }, []);
+
+  useEffect(() => {
+    if (!user || !isWelcome || !slackLoaded || slack.connected) return;
+    if (localStorage.getItem(slackPromptKey(user.id))) {
+      clearWelcomeParam();
+      return;
+    }
+
+    const timer = window.setTimeout(() => setShowSlackPrompt(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [user, isWelcome, slackLoaded, slack.connected, clearWelcomeParam]);
+
+  useEffect(() => {
+    if (slack.connected) setShowSlackPrompt(false);
+  }, [slack.connected]);
+
+  function dismissSlackPrompt() {
+    if (user) localStorage.setItem(slackPromptKey(user.id), '1');
+    setShowSlackPrompt(false);
+    clearWelcomeParam();
+  }
+
+  function connectSlack() {
+    window.open('/api/auth/slack', '_blank', 'noopener,noreferrer');
+    dismissSlackPrompt();
+  }
 
   async function disconnectSlack() {
     await api.slackDisconnect();
@@ -62,6 +112,7 @@ export function DashboardLayout() {
       </main>
 
       {notice && <Toast message={notice} onDismiss={dismissNotice} />}
+      {showSlackPrompt && <SlackConnectPrompt onDismiss={dismissSlackPrompt} onConnect={connectSlack} />}
     </div>
   );
 }

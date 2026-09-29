@@ -6,7 +6,7 @@ export function Button({ variant = 'primary', className = '', ...props }: Button
     variant === 'primary' ? 'bg-brand text-white hover:opacity-90' : 'border border-brand text-brand hover:bg-brand-soft';
   return (
     <button
-      className={`rounded-full px-4 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
+      className={`cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
       {...props}
     />
   );
