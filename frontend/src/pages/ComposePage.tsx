@@ -4,17 +4,13 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Button, ErrorBanner } from '../components/ui';
 import { AttachmentIcon, BackIcon, CalendarIcon, ClockIcon, UploadIcon } from '../components/icons';
+import { MessageEditor } from '../components/MessageEditor';
 
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
 const extractEmails = (text: string) => [...new Set((text.match(EMAIL_PATTERN) ?? []).map((e) => e.toLowerCase()))];
 
-const escapeHtml = (text: string) =>
-  text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
+const isBodyEmpty = (html: string) => html.replace(/<[^>]*>/g, '').trim().length === 0;
 
 const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -171,7 +167,7 @@ export function ComposePage() {
       const result = await api.schedule({
         senderId,
         subject,
-        body: escapeHtml(body) + attachmentHtml,
+        body: body + attachmentHtml,
         recipients,
         startAt: startAt ? new Date(startAt).toISOString() : undefined,
         delayBetweenSendsMs: delaySeconds ? Math.round(Number(delaySeconds) * 1000) : undefined,
@@ -219,7 +215,11 @@ export function ComposePage() {
           <button type="button" onClick={() => setShowSendLater((v) => !v)} aria-label="Send later" className="text-icon hover:text-ink">
             <ClockIcon className="h-4 w-4" />
           </button>
-          <Button type="submit" variant="ghost" disabled={submitting || recipients.length === 0 || !senderId}>
+          <Button
+            type="submit"
+            variant="ghost"
+            disabled={submitting || recipients.length === 0 || !senderId || isBodyEmpty(body)}
+          >
             {submitting ? 'Scheduling…' : startAt ? 'Send Later' : 'Send'}
           </Button>
           {showSendLater && (
@@ -294,13 +294,9 @@ export function ComposePage() {
         </div>
       </div>
 
-      <textarea
-        className="mt-4 h-48 w-full resize-none rounded-lg bg-surface p-4 text-sm text-ink placeholder:text-muted focus:outline-none"
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Type Your Reply…"
-        required
-      />
+      <div className="mt-4">
+        <MessageEditor value={body} onChange={setBody} placeholder="Type Your Reply…" />
+      </div>
 
       {attachments.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-3">
