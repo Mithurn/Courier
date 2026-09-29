@@ -54,6 +54,8 @@ export function EmailListPage({ tab }: { tab: Tab }) {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [filterOpen]);
 
+  const prevSentRef = useRef<number | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -65,6 +67,12 @@ export function EmailListPage({ tab }: { tab: Tab }) {
       const [items, nextCounts] = await Promise.all([list, api.counts()]);
       setData(items);
       setCounts(nextCounts);
+
+      if (prevSentRef.current !== null && nextCounts.sent > prevSentRef.current) {
+        const diff = nextCounts.sent - prevSentRef.current;
+        setNotice(`${diff} email${diff > 1 ? 's' : ''} sent successfully!`);
+      }
+      prevSentRef.current = nextCounts.sent;
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -72,9 +80,34 @@ export function EmailListPage({ tab }: { tab: Tab }) {
     }
   }, [tab, page, query, statusFilter, labelFilter, setCounts]);
 
+  const poll = useCallback(async () => {
+    try {
+      const list = query
+        ? api.search(query, page)
+        : tab === 'scheduled'
+          ? api.scheduled(page, statusFilter === 'scheduled' || statusFilter === 'sending' ? statusFilter : undefined, labelFilter)
+          : api.sent(page, statusFilter === 'sent' || statusFilter === 'failed' ? statusFilter : undefined, labelFilter);
+      const [items, nextCounts] = await Promise.all([list, api.counts()]);
+      setData(items);
+      setCounts(nextCounts);
+
+      if (prevSentRef.current !== null && nextCounts.sent > prevSentRef.current) {
+        const diff = nextCounts.sent - prevSentRef.current;
+        setNotice(`${diff} email${diff > 1 ? 's' : ''} sent successfully!`);
+      }
+      prevSentRef.current = nextCounts.sent;
+    } catch {
+      // ignore poll errors
+    }
+  }, [tab, page, query, statusFilter, labelFilter, setCounts]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    const timer = setInterval(() => {
+      poll();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [load, poll]);
 
   useEffect(() => {
     if (notice) navigate(location.pathname, { replace: true, state: {} });
