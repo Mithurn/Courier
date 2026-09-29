@@ -36,7 +36,7 @@ jobs:
         run: npm run build
 
       - name: Deploy to EC2
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.EC2_HOST != ''
+        if: github.event_name == 'push'
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
