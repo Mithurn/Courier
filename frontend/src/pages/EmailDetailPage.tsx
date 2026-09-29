@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { statusLabels, statusStyles } from '../components/EmailTable';
-import { BackIcon } from '../components/icons';
+import { ArchiveIcon, BackIcon, ChevronDownIcon, StarIcon, TrashIcon } from '../components/icons';
 import type { EmailDetail } from '../types';
 
 const formatTime = (iso: string) =>
@@ -23,11 +23,24 @@ export function EmailDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-      <div className="mb-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
-          <BackIcon />
-        </button>
-        <h1 className="truncate text-xl text-ink sm:text-2xl">{email?.subject ?? 'Email'}</h1>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <button onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
+            <BackIcon />
+          </button>
+          <h1 className="truncate text-xl text-ink sm:text-2xl">{email?.subject ?? 'Email'}</h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-4 text-icon">
+          <button type="button" aria-label="Star" className="hover:text-ink">
+            <StarIcon />
+          </button>
+          <button type="button" aria-label="Archive" className="hover:text-ink">
+            <ArchiveIcon />
+          </button>
+          <button type="button" aria-label="Delete" className="hover:text-ink">
+            <TrashIcon />
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-red-600">{error}</p>}
@@ -41,7 +54,9 @@ export function EmailDetailPage() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{email.from}</p>
-              <p className="truncate text-xs text-muted">to {email.toEmail}</p>
+              <p className="flex items-center gap-1 truncate text-xs text-muted">
+                to {email.toEmail} <ChevronDownIcon />
+              </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <span className="text-xs text-muted">{formatTime(email.sentAt ?? email.scheduledAt)}</span>
