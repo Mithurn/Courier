@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { useAuth } from '../context/AuthContext';
 import type { Counts, User } from '../types';
+import { AccountMenu } from './AccountMenu';
 
 function ClockIcon() {
   return (
@@ -73,9 +72,6 @@ type Props = {
 };
 
 export function Sidebar({ user, counts, senderReady, slack, open, onDisconnectSlack, onClose }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const { logout } = useAuth();
-
   return (
     <>
       {open && <div className="fixed inset-0 z-20 bg-black/30 md:hidden" onClick={onClose} />}
@@ -88,36 +84,30 @@ export function Sidebar({ user, counts, senderReady, slack, open, onDisconnectSl
           <img src={logo} alt="ONB" className="h-6 w-auto" />
         </div>
 
-        <div className="relative mt-2 shrink-0">
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-surface px-3 py-2.5 text-left"
-          >
-            <span className="flex items-center gap-2 overflow-hidden">
-              {user.avatarUrl && <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-7 w-7 shrink-0 rounded-full" />}
-              <span className="overflow-hidden leading-tight">
-                <span className="block truncate text-sm font-medium text-ink">{user.name}</span>
-                <span className="block truncate text-xs text-muted">{user.email}</span>
-              </span>
-            </span>
-            <ChevronIcon />
-          </button>
-          {menuOpen && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-lg border border-border bg-white p-1 text-sm shadow-sm">
-              {slack.connected ? (
-                <button onClick={onDisconnectSlack} className="block w-full rounded px-3 py-2 text-left text-muted hover:bg-surface">
-                  Slack: {slack.teamName} (disconnect)
-                </button>
-              ) : (
-                <a href="/api/auth/slack" className="block rounded px-3 py-2 text-left text-brand hover:bg-surface">
-                  Connect Slack
-                </a>
-              )}
-              <button onClick={logout} className="block w-full rounded px-3 py-2 text-left text-muted hover:bg-surface">
-                Logout
+        <div className="mt-2 shrink-0">
+          <AccountMenu
+            user={user}
+            slack={slack}
+            onDisconnectSlack={onDisconnectSlack}
+            trigger={({ onClick }) => (
+              <button
+                type="button"
+                onClick={onClick}
+                className="flex h-14 w-full items-center justify-between rounded-2xl bg-surface px-3 py-2.5 text-left"
+              >
+                <span className="flex items-center gap-2 overflow-hidden">
+                  {user.avatarUrl && (
+                    <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-7 w-7 shrink-0 rounded-full" />
+                  )}
+                  <span className="overflow-hidden leading-tight">
+                    <span className="block truncate text-sm font-medium text-ink">{user.name}</span>
+                    <span className="block truncate text-xs text-muted">{user.email}</span>
+                  </span>
+                </span>
+                <ChevronIcon />
               </button>
-            </div>
-          )}
+            )}
+          />
         </div>
 
         <div className="shrink-0 py-2.5">

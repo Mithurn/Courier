@@ -7,7 +7,7 @@ import { Button, ErrorBanner, Spinner } from '../components/ui';
 import { AttachmentIcon, BackIcon, CalendarIcon, ChevronDownIcon, ClockIcon, UploadIcon } from '../components/icons';
 import { MessageEditor } from '../components/MessageEditor';
 
-const isDev = import.meta.env.DEV;
+const mockFixtures = import.meta.env.DEV && import.meta.env.VITE_DEV_FIXTURES === 'true';
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
 const extractEmails = (text: string) => [...new Set((text.match(EMAIL_PATTERN) ?? []).map((e) => e.toLowerCase()))];
@@ -129,10 +129,10 @@ export function ComposePage() {
   const navigate = useNavigate();
 
   const [senderId, setSenderId] = useState(senders[0]?.id ?? '');
-  const [recipients, setRecipients] = useState<string[]>(isDev ? ['recipient@example.com'] : []);
+  const [recipients, setRecipients] = useState<string[]>(mockFixtures ? ['recipient@example.com'] : []);
   const [recipientDraft, setRecipientDraft] = useState('');
-  const [subject, setSubject] = useState(isDev ? 'Demo subject' : '');
-  const [body, setBody] = useState(isDev ? '<p>Demo message for local UI review.</p>' : '');
+  const [subject, setSubject] = useState(mockFixtures ? 'Demo subject' : '');
+  const [body, setBody] = useState(mockFixtures ? '<p>Demo message for local UI review.</p>' : '');
   const [startAt, setStartAt] = useState('');
   const [delaySeconds, setDelaySeconds] = useState('');
   const [hourlyLimit, setHourlyLimit] = useState('');

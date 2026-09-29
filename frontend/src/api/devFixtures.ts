@@ -85,8 +85,8 @@ export const DEV_DETAIL: EmailDetail = {
 </div>
 <p>Your coach for world-class performance,<br/>Grant</p>
 <p><em>P.S. Always remember that you can develop world class technique! 🚀</em></p>
-<img src="https://images.unsplash.com/photo-1595435934249-5df7f325bbad?w=420&h=234&fit=crop" alt="Tennis_Coach_Profile.png" />
-<img src="https://images.unsplash.com/photo-1622163642999-958049106b47?w=420&h=234&fit=crop" alt="Tennis_Coach_Profile2.png" />`,
+<img src="https://picsum.photos/seed/tennis1/420/234" alt="Tennis_Coach_Profile.png" />
+<img src="https://picsum.photos/seed/tennis2/420/234" alt="Tennis_Coach_Profile2.png" />`,
 };
 
 export function devPage<T>(items: T[]): Page<T> {

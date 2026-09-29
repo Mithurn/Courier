@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { AccountMenu } from '../components/AccountMenu';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { RecipientLabel } from '../components/RecipientLabel';
 import { ErrorBanner, Spinner } from '../components/ui';
-import { ArchiveIcon, BackIcon, ChevronDownIcon, StarIcon, TrashIcon } from '../components/icons';
+import { ArchiveIcon, BackIcon, StarIcon, TrashIcon } from '../components/icons';
 import type { EmailDetail } from '../types';
 
 const formatTime = (iso: string) =>
@@ -28,17 +30,6 @@ function parseEmailBody(html: string) {
   return { body, attachments };
 }
 
-const bodyStyles = `
-  body { margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 26px; letter-spacing: -0.31px; color: #1E2939; }
-  p { margin: 0 0 16px; }
-  p:last-child { margin-bottom: 0; }
-  img { max-width: 100%; }
-`;
-
-function wrapEmailBody(html: string) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${bodyStyles}</style></head><body>${html}</body></html>`;
-}
-
 export function EmailDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -47,6 +38,16 @@ export function EmailDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
+  const [slack, setSlack] = useState<{ connected: boolean; teamName: string | null }>({ connected: false, teamName: null });
+
+  useEffect(() => {
+    api.slackStatus().then(setSlack).catch(() => undefined);
+  }, []);
+
+  async function disconnectSlack() {
+    await api.slackDisconnect();
+    setSlack({ connected: false, teamName: null });
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -62,6 +63,12 @@ export function EmailDetailPage() {
 
   const parsed = useMemo(() => (email ? parseEmailBody(email.body) : null), [email]);
 
+  function handleBodyClick(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLImageElement)) return;
+    setPreview({ src: target.src, alt: target.alt || 'attachment' });
+  }
+
   if (loading && !email) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-muted">
@@ -72,8 +79,8 @@ export function EmailDetailPage() {
   }
 
   return (
-    <div className="flex w-full flex-col">
-      <div className="flex w-full items-center justify-between gap-2.5 px-4 pt-5 sm:px-6">
+    <div className="flex min-h-screen w-full flex-col">
+      <div className="flex w-full shrink-0 items-center justify-between gap-2.5 px-4 pt-5 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
           <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="shrink-0 rounded-full p-1 text-ink hover:bg-surface">
             <BackIcon />
@@ -91,23 +98,33 @@ export function EmailDetailPage() {
             <TrashIcon />
           </button>
           {user && (
-            user.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-            ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E5E7EB] text-xs font-medium text-ink">
-                {user.name[0]?.toUpperCase() ?? user.email[0]?.toUpperCase()}
-              </span>
-            )
+            <AccountMenu
+              user={user}
+              slack={slack}
+              onDisconnectSlack={disconnectSlack}
+              align="right"
+              trigger={({ onClick }) => (
+                <button type="button" onClick={onClick} aria-label="Account menu" className="shrink-0 rounded-full">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E5E7EB] text-xs font-medium text-ink">
+                      {user.name[0]?.toUpperCase() ?? user.email[0]?.toUpperCase()}
+                    </span>
+                  )}
+                </button>
+              )}
+            />
           )}
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 px-4 pt-4 pb-6 sm:px-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1040px] flex-1 flex-col px-4 pt-4 pb-6 sm:px-6">
         {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
 
         {email && parsed && (
           <>
-            <div className="flex items-start gap-3">
+            <div className="flex shrink-0 items-start gap-3 pb-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-base font-semibold text-white">
                 {displayNameFromEmail(email.from)[0]?.toUpperCase()}
               </span>
@@ -116,35 +133,38 @@ export function EmailDetailPage() {
                   <span className="font-semibold">{displayNameFromEmail(email.from)}</span>{' '}
                   <span className="text-muted">&lt;{email.from}&gt;</span>
                 </p>
-                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
-                  to me
-                  <ChevronDownIcon />
-                </p>
+                <RecipientLabel toEmail={email.toEmail} viewerEmail={user?.email} />
               </div>
               <span className="shrink-0 text-xs text-muted">{formatTime(email.sentAt ?? email.scheduledAt)}</span>
             </div>
 
-            {email.failReason && <p className="text-sm text-red-600">{email.failReason}</p>}
+            {email.failReason && <p className="mb-4 shrink-0 text-sm text-red-600">{email.failReason}</p>}
 
-            <iframe title="Email body" sandbox="" srcDoc={wrapEmailBody(parsed.body)} className="min-h-[240px] w-full border-0 bg-transparent" />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div
+                className="text-base leading-[26px] tracking-[-0.31px] text-ink [&_p]:mb-4 [&_p:last-child]:mb-0"
+                dangerouslySetInnerHTML={{ __html: parsed.body }}
+                onClick={handleBodyClick}
+              />
 
-            {parsed.attachments.length > 0 && (
-              <div className="flex flex-wrap gap-3">
-                {parsed.attachments.map((file) => (
-                  <div key={file.src} className="w-[210px] shrink-0 overflow-hidden rounded-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => setPreview(file)}
-                      className="block w-full"
-                      aria-label={`Preview ${file.alt}`}
-                    >
-                      <img src={file.src} alt={file.alt} className="h-[117px] w-full object-cover" />
-                    </button>
-                    <p className="mt-2 truncate text-sm text-ink">{file.alt}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+              {parsed.attachments.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-3 pb-2">
+                  {parsed.attachments.map((file) => (
+                    <div key={file.src} className="w-[210px] shrink-0 overflow-hidden rounded-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setPreview(file)}
+                        className="block w-full"
+                        aria-label={`Preview ${file.alt}`}
+                      >
+                        <img src={file.src} alt={file.alt} className="h-[117px] w-full object-cover" />
+                      </button>
+                      <p className="mt-2 truncate text-sm text-ink">{file.alt}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
