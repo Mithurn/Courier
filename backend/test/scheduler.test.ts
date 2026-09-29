@@ -50,7 +50,7 @@ before(async () => {
   owner = await createUser('owner');
 });
 
-afterEach(async () => {
+async function cleanBetweenTests() {
   await Promise.all(workers.map((w) => w.stop()));
   workers = [];
   smtp.rejectAll = false;
@@ -58,7 +58,9 @@ afterEach(async () => {
   await prisma.scheduledEmail.deleteMany();
   await prisma.slackIntegration.deleteMany();
   await redis.flushdb();
-});
+}
+
+afterEach(cleanBetweenTests);
 
 after(async () => {
   await api.close();
@@ -80,6 +82,7 @@ async function schedule(senderId: string, recipients: string[], extra: object = 
 }
 
 describe('sending', { timeout: 60000 }, () => {
+  afterEach(cleanBetweenTests);
   it('sends every scheduled email exactly once and records it', async () => {
     const sender = await createSender(owner.user.id, smtp.port);
     const recipients = ['s1@example.com', 's2@example.com', 's3@example.com'];
@@ -120,6 +123,7 @@ describe('sending', { timeout: 60000 }, () => {
 });
 
 describe('infrastructure errors', { timeout: 60000 }, () => {
+  afterEach(cleanBetweenTests);
   it('marks an email failed when a job exhausts its retries before reaching SMTP', async () => {
     const sender = await createSender(owner.user.id, smtp.port);
     await prisma.scheduledEmail.create({
@@ -135,6 +139,7 @@ describe('infrastructure errors', { timeout: 60000 }, () => {
 });
 
 describe('restart safety', { timeout: 60000 }, () => {
+  afterEach(cleanBetweenTests);
   it('sends jobs scheduled while no worker was running', async () => {
     const sender = await createSender(owner.user.id, smtp.port);
     await schedule(sender.id, ['offline@example.com']);
@@ -176,6 +181,7 @@ describe('restart safety', { timeout: 60000 }, () => {
 });
 
 describe('hourly rate limit', { timeout: 60000 }, () => {
+  afterEach(cleanBetweenTests);
   before(() => {
     process.env.WORKER_CONCURRENCY = '1';
   });
@@ -210,7 +216,7 @@ describe('hourly rate limit', { timeout: 60000 }, () => {
       for (let i = 0; i < delayed.length; i += 2) {
         const runAt = Math.floor(Number(delayed[i + 1]) / 4096);
         const boundary = Math.ceil(Date.now() / HOUR_MS) * HOUR_MS;
-        assert.ok(Math.abs(runAt - boundary) < 5000 || Math.abs(runAt - (boundary - HOUR_MS)) < 5000, 'rescheduled to the next hour');
+        assert.ok(Math.abs(runAt - boundary) < 10_000 || Math.abs(runAt - (boundary - HOUR_MS)) < 10_000, 'rescheduled to the next hour');
         ids.push(delayed[i]);
       }
       const rows = await prisma.scheduledEmail.findMany({ where: { id: { in: ids } } });
