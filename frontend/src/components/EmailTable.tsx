@@ -1,14 +1,14 @@
 import type { EmailListItem } from '../types';
 import { ClockIcon, StarIcon } from './icons';
 
-const statusStyles: Record<string, string> = {
+export const statusStyles: Record<string, string> = {
   scheduled: 'bg-pill-scheduled-bg border-pill-scheduled-border text-pill-scheduled-text',
   sending: 'bg-pill-sending-bg border-pill-sending-border text-pill-sending-text',
   sent: 'bg-pill-sent-bg border-pill-sent-border text-pill-sent-text',
   failed: 'bg-red-100 border-red-200 text-red-700',
 };
 
-const statusLabels: Record<string, string> = {
+export const statusLabels: Record<string, string> = {
   scheduled: 'Scheduled',
   sending: 'Sending',
   sent: 'Sent',

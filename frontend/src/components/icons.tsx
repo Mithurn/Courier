@@ -48,6 +48,28 @@ export function ClockIcon({ className = '' }: IconProps) {
   );
 }
 
+export function BackIcon({ className = '' }: IconProps) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+      <path d="M12.5 15 7.5 10l5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function UploadIcon({ className = '' }: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M8 10.5V2.5M8 2.5 5 5.5M8 2.5l3 3M3 11v1.5A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5V11"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function StarIcon({ className = '' }: IconProps) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
