@@ -62,10 +62,12 @@ const worker = new Worker<EmailJobData>(
     if (!allowed) {
       await job.log(`Hourly limit reached (${hourlyLimit}/hr). Deferred to ${new Date(retryAt).toISOString()}`);
       if (await claimRateLimitAlert(email.senderId)) {
-        await notifyRateLimitHit(
-          email.sender.ownerId,
-          `:warning: *${email.sender.name}* hit its hourly limit (${hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
-        );
+        await notifyRateLimitHit(email.sender.ownerId, {
+          senderName: email.sender.name,
+          senderEmail: email.sender.smtpUser,
+          hourlyLimit,
+          retryAt,
+        });
         await job.log('Sent live Slack rate-limit alert.');
       }
       await job.moveToDelayed(retryAt, token);
