@@ -1,10 +1,71 @@
 # Courier
 
-Email scheduler and dashboard. Schedules emails with BullMQ delayed jobs (no cron), sends them through Ethereal SMTP, and survives restarts without losing or duplicating a send.
+Courier is a production-grade email scheduling service and dashboard built with TypeScript, Express 5, BullMQ, Redis, MySQL, and Elasticsearch. It schedules emails at exact timestamps using delayed queue jobs without cron, guarantees persistence across server crashes and worker restarts, and enforces configurable per-sender hourly rate limits with in-order deferral.
 
-Stack: TypeScript, Express 5, BullMQ + Redis, MySQL + Prisma, Elasticsearch, Ethereal SMTP. The React + Tailwind frontend lives in `frontend/`.
+Live Production URL: https://mithurnscourier.duckdns.org
 
-## Quick start (single command)
+## Modular Documentation
+
+Detailed technical documentation is separated by responsibility:
+
+* [Backend Documentation](backend/README.md): Architecture, BullMQ worker mechanics, rate-limit algorithms, database schema, API reference, and test suite.
+* [Frontend Documentation](frontend/README.md): React components, Figma design tokens, state management, background polling, and real-time toast notifications.
+
+---
+
+## Architectural Overview
+
+```
+Client / Dashboard Browser
+            │
+            ▼
+   Caddy Reverse Proxy (:80, :443 TLS)
+      ├── /api/*  ──▶ Express API (:4000)
+      ├── /admin/* ─▶ Bull Board Queue Dashboard (:4000)
+      └── /*      ──▶ Vite Production Static Build
+            │
+            ▼
+Express API & BullMQ Worker (Decoupled Processes)
+      ├── MySQL 8.4 (Prisma ORM) ──────── Transactional source of truth
+      ├── Redis 7 (BullMQ & Rates) ────── Delayed job sets, rate limits, send pacing
+      └── Elasticsearch 8 ─────────────── Asynchronous read-projection for search
+```
+
+---
+
+## Features Implemented
+
+### Backend Requirements
+
+| Requirement | Implementation | Details |
+|---|---|---|
+| Scheduler (No Cron) | BullMQ Delayed Jobs | One delayed job per recipient in Redis. Zero OS crontab or node-cron usage. |
+| Persistence & Restarts | Redis AOF + MySQL | Resumes delayed jobs after process restarts; reconciles database rows on boot. |
+| Idempotency | 3-Layer Dedup | Deterministic `jobId = email.id`, DB status guard (`UPDATE ... WHERE status = 'scheduled'`), API `Idempotency-Key` header. |
+| Rate Limiting | Redis Fixed Window | Atomic counter keyed by `rl:<senderId>:<YYYYMMDDHH>` in UTC. Over-limit jobs are deferred into the next hour window (zero dropped jobs). |
+| Provider Throttling | Minimum Send Delay | Enforces minimum 2-second gap per sender (`SET NX PX` in Redis) to prevent provider throttling. |
+| Worker Concurrency | Configurable Concurrency | `WORKER_CONCURRENCY` defines parallel job processing capability per worker instance. |
+| Slack Notification | Real Slack OAuth v2 | Webhook alert dispatched to Slack channel on rate-limit breach with 1-hour deduplication lock. |
+| Search | Elasticsearch Projection | Full-text search over subjects, recipients, and body previews. Reads match IDs, canonical rows load from MySQL. |
+| Observability | Bull Board Dashboard | Protected `/admin/queues` dashboard displaying queue status, job logs, progress bars, and return values. |
+
+### Frontend Requirements
+
+| Requirement | Implementation | Details |
+|---|---|---|
+| Figma Adherence | Tailwind CSS v4 Tokens | Exact reproduction of typography, color palette, sidebar navigation, and status pills. |
+| Authentication | Google OAuth 2.0 | Real Google OAuth authorization code flow storing JWT in an httpOnly `SameSite=Lax` cookie. |
+| Dashboard | Sidebar & Navigation | Sidebar layout with user avatar, name, email, active tab badge counters, and logout option. |
+| Scheduled Emails | Dynamic Email Table | Displays scheduled time, live countdown timer for future jobs, pagination, and empty states. |
+| Sent Emails | Delivery Log Table | Displays sent timestamp, sent/failed status pills, error reason tooltips, and pagination. |
+| Compose Workflow | Rich Text & Attachments | ContentEditable formatting toolbar, image attachment previews, and recipient chip tokenization. |
+| Bulk Lead Import | CSV & TXT Parser | Parses uploaded lead lists up to 5,000 emails with recipient count and overflow badges. |
+| Real-Time Updates | Background Polling | Polls every 4 seconds to update tab counts and list status without full-page reloads. |
+| User Notifications | Consolidated Toasts | Distinct warm-orange toast for scheduled jobs (2s dismiss) and green toast when background delivery finishes. |
+
+---
+
+## Quick Start (Single Command)
 
 Requires Docker and Node 20+. Starts backing services (MySQL, Redis, Elasticsearch), runs database migrations, and launches the backend API, BullMQ worker, and frontend concurrently:
 
@@ -12,164 +73,140 @@ Requires Docker and Node 20+. Starts backing services (MySQL, Redis, Elasticsear
 ./run-local.sh
 ```
 
-- Frontend: `http://localhost:5173`
-- Bull Board: `http://localhost:4000/admin/queues`
-- API Docs: `http://localhost:4000/docs`
-- Health: `http://localhost:4000/health`
+Service URLs:
+* Frontend: `http://localhost:5173`
+* Bull Board: `http://localhost:4000/admin/queues` (credentials: `admin` / `515c3f87f16c058e281a53b8`)
+* API Docs: `http://localhost:4000/docs`
+* Health Check: `http://localhost:4000/health`
 
 ---
 
-## Run manually (step by step)
+## Step-by-Step Local Setup
 
-### 1. Run the backend
-
-Requires Node 22 and Docker.
-
+### 1. Start Backing Infrastructure
 ```bash
-docker compose up -d                 # MySQL, Redis, Elasticsearch
+docker compose up -d
+```
+Starts MySQL 8.4 on port 3306, Redis 7 on port 6379, and Elasticsearch 8.15 on port 9200.
+
+### 2. Run the Backend
+```bash
 cd backend
-cp .env.example .env                 # fill in the blanks, see below
+cp .env.example .env
 npm ci
 npx prisma migrate deploy
-npm run dev                          # API on :4000
-npm run worker                       # in a second terminal
+npm run dev                          # API server on :4000
+npm run worker                       # Queue worker (in a second terminal)
 ```
 
-Bull Board is at `http://localhost:4000/admin/queues` (basic auth from `BULLBOARD_USER` / `BULLBOARD_PASSWORD`).
-
-API docs (OpenAPI/Swagger UI) are at `http://localhost:4000/docs`, spec at `http://localhost:4000/openapi.json`.
-
-## Run the frontend
-
-Requires Node 20 or newer.
-
+### 3. Run the Frontend
 ```bash
 cd frontend
 npm ci
-npm run dev                          # UI on http://localhost:5173
+npm run dev                          # Vite development server on :5173
 ```
 
-### Environment
+---
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL`, `REDIS_URL`, `ELASTICSEARCH_URL`, `ELASTICSEARCH_INDEX` | Infrastructure |
-| `WORKER_CONCURRENCY` | Parallel jobs per worker (default 5) |
-| `MIN_DELAY_BETWEEN_SENDS_MS` | Minimum gap between two sends from one sender (default 2000) |
-| `MAX_EMAILS_PER_HOUR_PER_SENDER` | Hourly cap per sender (default 50) |
-| `DAILY_EMAIL_QUOTA_PER_USER` | Emails a user can schedule per UTC day (default 5000) |
-| `JOB_RETRY_ATTEMPTS`, `JOB_RETRY_BACKOFF_MS` | BullMQ retries with exponential backoff |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | Google OAuth |
-| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` | Slack OAuth |
-| `JWT_SECRET` | Session signing, 32+ characters |
-| `FRONTEND_URL` | CORS origin and post-login redirect |
-| `TRUST_PROXY_HOPS` | Number of reverse proxies in front of the API |
-| `BULLBOARD_USER`, `BULLBOARD_PASSWORD` (12+ chars), `BULLBOARD_PATH` | Queue dashboard |
+## Environment Configuration
 
-### Ethereal
+Configuration variables for `backend/.env`:
 
-No setup. Senders are Ethereal test mailboxes created through `nodemailer.createTestAccount()`: one on first login, more with `POST /senders` (max 10 per user). Users never enter SMTP details. Sent mail is viewable in the Ethereal web inbox with the sender's credentials.
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | `mysql://...` | MySQL connection string for Prisma. |
+| `REDIS_URL` | `redis://...` | Redis connection for BullMQ and rate limits. |
+| `ELASTICSEARCH_URL` | `http://...` | Elasticsearch connection for search indexing. |
+| `ELASTICSEARCH_INDEX` | `courier-emails` | Index name for email documents. |
+| `WORKER_CONCURRENCY` | `5` | Maximum parallel jobs processed per worker. |
+| `MIN_DELAY_BETWEEN_SENDS_MS` | `2000` | Minimum pacing interval between sends per sender. |
+| `MAX_EMAILS_PER_HOUR_PER_SENDER`| `50` | Sender hourly throughput limit cap. |
+| `DAILY_EMAIL_QUOTA_PER_USER` | `5000` | Maximum emails a user can schedule per UTC day. |
+| `JOB_RETRY_ATTEMPTS` | `5` | Maximum retries before marking an email failed. |
+| `JOB_RETRY_BACKOFF_MS` | `5000` | Exponential backoff delay for retries. |
+| `GOOGLE_CLIENT_ID` | Required | Google Cloud Console OAuth client ID. |
+| `GOOGLE_CLIENT_SECRET` | Required | Google Cloud Console OAuth client secret. |
+| `GOOGLE_CALLBACK_URL` | Required | Redirect URL for Google OAuth callback. |
+| `SLACK_CLIENT_ID` | Required | Slack app client ID for webhook install. |
+| `SLACK_CLIENT_SECRET` | Required | Slack app client secret. |
+| `SLACK_REDIRECT_URI` | Required | Redirect URL for Slack OAuth callback. |
+| `JWT_SECRET` | Required | Secret string (32+ chars) for signing session JWTs. |
+| `FRONTEND_URL` | `http://localhost:5173` | Client origin for CORS and authentication redirects. |
+| `TRUST_PROXY_HOPS` | `1` | Number of upstream reverse proxies. |
+| `BULLBOARD_USER` | `admin` | Basic auth username for queue dashboard. |
+| `BULLBOARD_PASSWORD` | Required | Basic auth password (12+ chars) for queue dashboard. |
+| `BULLBOARD_PATH` | `/admin/queues` | HTTP path where Bull Board is mounted. |
 
-### OAuth apps
+---
 
-- Google: create a Web OAuth client and add `GOOGLE_CALLBACK_URL` as an authorized redirect URI.
-- Slack: create an app with the `incoming-webhook` scope, turn on Public Distribution, and add `SLACK_REDIRECT_URI` as a redirect URL.
+## Ethereal Email Setup
 
-## How it works
+Courier uses Ethereal Email (`https://ethereal.email`) for SMTP testing.
+* Users do not need to configure SMTP credentials manually.
+* Senders are auto-provisioned on demand via `nodemailer.createTestAccount()`.
+* Each user receives an auto-created Ethereal identity on first login; additional senders can be provisioned via `POST /senders`.
+* Outgoing emails are accepted by Ethereal and can be inspected in the Ethereal web inbox using the sender credentials stored in the `Sender` table.
 
-```
-POST /emails/schedule
-   -> validate, check sender ownership, reserve daily quota
-   -> insert one row per recipient (MySQL, status=scheduled)
-   -> add one BullMQ delayed job per row (jobId = row id)
-   -> index rows in Elasticsearch (best effort)
+---
 
-Worker (separate process)
-   pacing claim  ->  hourly window check  ->  scheduled->sending guard  ->  sendMail  ->  sent
-```
+## Architecture Deep Dive
 
-- **Scheduling:** one delayed job per email. Recipients in a batch are spaced by the requested delay: `scheduledAt = startAt + i * delay`. There is no cron, no repeatable job and no polling loop.
-- **Persistence:** jobs live in Redis and rows in MySQL. After a restart BullMQ resumes the delayed jobs. On boot the API and the worker also re-add every `scheduled` row with `jobId = row id`, which BullMQ dedupes. This covers a crash between the DB insert and the enqueue.
-- **Idempotency:** three layers. The job id equals the email id, so re-adding is a no-op. The worker claims the row with `UPDATE ... WHERE status = 'scheduled'`, so only one attempt proceeds. After a successful `sendMail` the row is never reset, so a database failure cannot cause a retry and a second send. A worker crash mid-send marks the row `failed` (at-most-once). `POST /emails/schedule` also accepts an `Idempotency-Key` header, and a repeat returns 409.
-- **Concurrency:** `WORKER_CONCURRENCY` jobs run in parallel per worker. All shared state (pacing, hourly counters) is in Redis and updated atomically, so several workers are safe.
+### Scheduling Mechanics (Zero Cron)
+* When a batch is submitted, rows are inserted into MySQL, and corresponding jobs are added to BullMQ using `emailQueue.addBulk()`.
+* Job delays are computed as `Math.max(0, scheduledAt.getTime() - now)`.
+* For batches with delays, schedules are spaced: `scheduledAt = startAt + (i * delayBetweenSendsMs)`.
+* BullMQ manages job execution timestamps using Redis sorted sets (`ZSET`). No recurring cron polling is used.
 
-### Delay between sends
+### Crash Persistence and Idempotency
+* Jobs are stored in Redis with Append-Only File (AOF) persistence enabled.
+* If a worker is interrupted or killed, unacknowledged jobs return to the queue.
+* On boot, the worker reconciliation routine queries MySQL for any rows in `scheduled` status where `trashed = false` and re-adds them to the queue.
+* Because `jobId` equals the email's unique ID, BullMQ skips already-existing jobs idempotently.
+* During execution, the worker acquires an atomic row lock:
+  ```sql
+  UPDATE ScheduledEmail
+  SET status = 'sending'
+  WHERE id = :id AND status = 'scheduled' AND trashed = false;
+  ```
+  If the row was already claimed or moved to trash, execution safely aborts without duplicate delivery.
+* After a successful SMTP handshake, the record transitions to `sent` and is never reverted.
 
-Minimum 2 seconds per sender (`MIN_DELAY_BETWEEN_SENDS_MS`). A request can ask for a longer delay, never a shorter one. The worker claims a per-sender slot with `SET key NX PX <delay>`. If the slot is taken the job is moved back to the delayed set for the remaining time, and it does not use an hourly slot.
+### Hourly Rate Limiting and In-Order Deferral
+* Hourly counters are keyed by sender and current UTC hour: `rl:<senderId>:<YYYYMMDDHH>`.
+* Counters increment atomically via `MULTI (SET NX + INCRBY)` with a 3,700-second TTL.
+* When the counter exceeds the sender's configured `hourlyLimit`:
+  1. The job is not failed or dropped.
+  2. The next run time is calculated to the start of the next UTC hour window plus a sub-second offset (`orderOffsetMs`) to preserve relative FIFO queue order.
+  3. The job is rescheduled using `job.moveToDelayed(retryAt, token)`.
+  4. An alert lock (`rl-alert:<senderId>:<hour>`) is claimed via atomic `SET NX EX`. If claimed, a live Block Kit message is dispatched to the user's Slack webhook.
 
-### Hourly rate limit
+### Behavior Under Heavy Load (1,000+ Emails)
+* 1,000 emails scheduled simultaneously are written via bulk database insert and bulk queue enqueue.
+* The worker enforces the 2-second minimum delay between sends per sender via Redis atomic lock (`SET key NX PX <delay>`).
+* The first batch up to the hourly limit sends sequentially at the pacing interval.
+* All subsequent jobs in the hour hit the rate limit and are deferred to the next hour window in Redis within milliseconds.
+* A single Slack alert is pushed for the sender.
+* The remaining queue drains automatically window by window across future hours without manual intervention or memory leaks.
 
-- Counter key: `rl:<senderId>:<YYYYMMDDHH>` in UTC. `SET NX EX` and `INCR` run in one Redis transaction, so the counter always has a TTL and works across workers and instances.
-- The limit is `MAX_EMAILS_PER_HOUR_PER_SENDER` by default. A request can lower it for its own batch, never raise it above the sender's cap.
-- When the counter passes the limit the job is moved to the next UTC hour boundary with `moveToDelayed`. It is never dropped and never marked failed. Deferred jobs land on the boundary plus 1 ms per second of their original due time, so they keep their relative order (best effort, as the brief allows).
-- Trade-off: a fixed window allows a burst at the boundary (a full quota at 10:59 and again at 11:00). A sliding window is smoother but has no clean "next window" to reschedule into.
+---
 
-### Behaviour under load
-
-1000 emails for the same instant with a limit of 50 per hour:
-- All 1000 rows and jobs are created up front (one batch insert, one bulk enqueue).
-- Each sender is paced to one email per delay. The first 50 in the hour send. Every later job hits the limit and is moved to the start of the next hour. Nothing is dropped, and one Slack alert is sent per sender per hour.
-- Each following hour releases the next 50, in order, until the queue drains.
-- Load stays bounded by Redis: two small keys per sender per hour, independent of the number of emails.
-
-### Slack alert
-
-`Connect Slack` runs a real OAuth v2 install and stores the incoming webhook per user. When a sender first hits its hourly limit in a window, the worker posts a live message to that user's channel (5 second timeout, never throws, once per sender per hour). Without a connection the alert is skipped. Connecting later works immediately, and `POST /auth/slack/disconnect` removes it.
-
-### Search
-
-Elasticsearch is a projection. Emails are indexed when scheduled and re-indexed on every status change. A failure to index never blocks a send. `GET /emails/search` asks Elasticsearch which ids match (filtered to the caller's senders), then returns the rows from MySQL, so MySQL stays the source of truth.
-
-## API
-
-All routes except `/health` and `/auth/*` need the session cookie. Every query is scoped to the logged-in user.
-
-| Method and path | Purpose |
-|---|---|
-| `GET /auth/google`, `/auth/google/callback` | Google login |
-| `GET /auth/me`, `POST /auth/logout` | Current user, logout |
-| `GET /auth/slack`, `/auth/slack/callback` | Slack install |
-| `GET /auth/slack/status`, `POST /auth/slack/disconnect` | Slack state |
-| `GET /senders`, `POST /senders` | List senders, create an Ethereal sender |
-| `POST /emails/schedule` | Schedule a batch: `senderId, subject, body (HTML), recipients[], startAt?, delayBetweenSendsMs?, hourlyLimit?` |
-| `GET /emails/scheduled`, `GET /emails/sent?status=` | Paginated lists (`page`, `pageSize`) |
-| `GET /emails/counts` | Sidebar counts |
-| `GET /emails/:id` | One email with its full body |
-| `GET /emails/search?q=` | Search |
-| `GET /health` | Liveness |
-
-## Security and limits
-
-- httpOnly `SameSite=Lax` session cookie, JWT pinned to HS256, OAuth state cookie, `helmet`, CORS locked to `FRONTEND_URL`.
-- Redis-backed request rate limits: 300 requests per minute on reads, 20 per minute on schedule, 10 sender creations per hour, 30 login attempts per 15 minutes.
-- Per-user daily quota, 5000 recipients per request, 1 MB request body limit.
-- Senders can only be Ethereal accounts, so there is no user-supplied SMTP host.
-
-## Tests, CI and Docker
+## Automated Testing & CI/CD
 
 ```bash
 cd backend
-npm test          # migrates a courier_test database, then runs 25 tests
-npm run typecheck # src and tests
+npm test          # Runs 26 integration tests against live MySQL, Redis, ES, and SMTP
+npm run typecheck # Strict TypeScript compilation check
 ```
 
-The tests run against real MySQL, Redis and Elasticsearch (from `docker compose up -d`), a fake local SMTP server and a fake Slack webhook. They cover access control and tenant isolation, validation, batch scheduling, quota and idempotency, exactly-once sending, retries, failure handling, worker restarts, lost-job recovery, the hourly limit with in-order deferral, and the Slack alert.
+Automated pipelines run via GitHub Actions:
+* **Backend CI (`.github/workflows/backend-ci.yml`):** Runs tests against service containers, builds production Docker images, and pushes to GitHub Container Registry (GHCR).
+* **Frontend CI/CD (`.github/workflows/frontend-deploy.yml`):** Runs TypeScript compilation, bundles production assets with Vite, and deploys to the AWS EC2 production instance.
 
-GitHub Actions (`.github/workflows/backend-ci.yml`) runs typecheck, build, a production dependency audit and the tests against service containers. On `main` it also builds `backend/Dockerfile` and pushes it to GHCR. The same image runs the API (`node dist/server.js`) and the worker (`node dist/worker.js`). The image contains no Prisma CLI, so run `npx prisma migrate deploy` from the repo or a CI step against the target database before starting a new version.
+---
 
-## Deploying
+## Assumptions and Trade-offs
 
-Run the same image twice: the API (`node dist/server.js`) and the worker (`node dist/worker.js`). Both need the same environment. Backing services: MySQL 8, Redis 7 or newer, Elasticsearch 8. Run `npx prisma migrate deploy` from the repo or CI against the target database before the first start, then start the API, then the worker.
-
-Checklist:
-1. Set every variable in `backend/.env.example` on both processes. `JWT_SECRET` needs 32+ characters and `BULLBOARD_PASSWORD` 12+. Set `FRONTEND_URL` to the deployed frontend and `TRUST_PROXY_HOPS` to the number of proxies in front of the API.
-2. Add the production callback URLs (`GOOGLE_CALLBACK_URL`, `SLACK_REDIRECT_URI`) to the Google and Slack app consoles.
-3. Serve the frontend and API on one site, for example by proxying `/api` and `/auth` to the API, so the `SameSite=Lax` cookie is sent.
-4. Recreate the Elasticsearch index if one already exists from before the explicit mapping.
-5. Check `GET /health`, load `/admin/queues`, log in with Google, schedule an email, restart the worker before it is due, and trigger one rate-limit alert.
-
-## Assumptions and trade-offs
-
-- The body is stored once per recipient row. A separate campaign table would save space but needs more schema.
-- Cookies are `SameSite=Lax`, so the frontend and API must share a site in production (for example the frontend proxying `/api`).
-- Existing Elasticsearch indices created before the explicit mapping must be deleted and recreated.
+1. **Email Body Storage:** Email bodies are stored per recipient row to allow independent message tracking and rendering. For larger multi-tenant volume, extracting a shared `Campaign` table would reduce storage overhead.
+2. **Fixed Window vs. Sliding Window:** A fixed UTC hourly window was chosen over a sliding window because the assignment requires rescheduling excess jobs into the "next hour window". Fixed windows provide clean, predictable boundary targets.
+3. **Session Cookies:** Sessions use `SameSite=Lax` cookies. In production, Caddy serves both the frontend and proxies `/api` to Express on the same origin (`mithurnscourier.duckdns.org`), eliminating cross-site cookie restrictions.
+4. **Elasticsearch Projection:** MySQL is the ACID source of truth. Elasticsearch serves as an asynchronous projection for search. A temporary Elasticsearch indexing failure will never fail an email send.
