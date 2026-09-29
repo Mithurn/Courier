@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import type { Counts, User } from '../types';
 import { AccountMenu } from './AccountMenu';
 import { ScheduledClockIcon } from './icons';
