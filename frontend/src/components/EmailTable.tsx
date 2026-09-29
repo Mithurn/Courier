@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { EmailListItem } from '../types';
 import { ScheduledClockIcon, StarIcon } from './icons';
 import { formatDateTime } from '../lib/format';
@@ -18,6 +19,20 @@ export const statusLabels: Record<string, string> = {
 
 const formatTime = (iso: string) => formatDateTime(iso, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
+function formatScheduledTime(scheduledAtIso: string, now: number) {
+  const target = new Date(scheduledAtIso).getTime();
+  const diffSec = Math.round((target - now) / 1000);
+
+  if (diffSec <= 0) return 'Due now';
+  if (diffSec < 60) return `in ${diffSec}s`;
+  if (diffSec < 3600) {
+    const m = Math.floor(diffSec / 60);
+    const s = diffSec % 60;
+    return `in ${m}m ${s < 10 ? '0' : ''}${s}s`;
+  }
+  return formatTime(scheduledAtIso);
+}
+
 type Props = {
   items: EmailListItem[];
   total: number;
@@ -31,6 +46,13 @@ type Props = {
 };
 
 export function EmailTable({ items, total, page, pageSize, loading, timeField, onPage, onOpen, onToggleStar }: Props) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   if (loading) return <p className="py-10 text-center text-muted">Loading…</p>;
   if (items.length === 0) return <p className="py-10 text-center text-muted">No emails here yet.</p>;
 
@@ -39,8 +61,14 @@ export function EmailTable({ items, total, page, pageSize, loading, timeField, o
     <div>
       <ul>
         {items.map((email) => {
-          const time = formatTime(email[timeField] ?? email.scheduledAt);
+          const fullTime = formatTime(email[timeField] ?? email.scheduledAt);
           const showTimeInPill = email.status === 'scheduled' || email.status === 'sending';
+          const pillText =
+            email.status === 'scheduled'
+              ? formatScheduledTime(email.scheduledAt, now)
+              : email.status === 'sending'
+                ? 'Sending…'
+                : statusLabels[email.status];
           return (
             <li
               key={email.id}
@@ -50,10 +78,11 @@ export function EmailTable({ items, total, page, pageSize, loading, timeField, o
               <span className="w-20 shrink-0 truncate text-sm text-ink sm:w-32 md:w-40">To: {email.toEmail}</span>
               <span className="flex min-w-0 flex-1 items-center gap-1">
                 <span
+                  title={fullTime}
                   className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusStyles[email.status]}`}
                 >
                   {showTimeInPill && <ScheduledClockIcon active />}
-                  {showTimeInPill ? time : statusLabels[email.status]}
+                  {pillText}
                 </span>
                 <span className="min-w-0 truncate text-sm">
                   <span className="font-semibold text-ink">{email.subject}</span>
@@ -63,7 +92,7 @@ export function EmailTable({ items, total, page, pageSize, loading, timeField, o
               <span className="flex shrink-0 items-center gap-2">
                 {!showTimeInPill && (
                   <span className="hidden whitespace-nowrap text-xs text-muted opacity-0 transition-opacity group-hover:opacity-100 sm:inline">
-                    {time}
+                    {fullTime}
                   </span>
                 )}
                 <button
