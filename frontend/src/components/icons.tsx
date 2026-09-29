@@ -227,6 +227,14 @@ export function AlignRightIcon({ className = '' }: IconProps) {
   );
 }
 
+export function AlignJustifyIcon({ className = '' }: IconProps) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path d="M2.5 4h11M2.5 7.3h11M2.5 10.7h11M2.5 14h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function OrderedListIcon({ className = '' }: IconProps) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">

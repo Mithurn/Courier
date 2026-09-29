@@ -20,9 +20,11 @@ const fileToDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-function FieldRow({ label, children }: { label: string; children: ReactNode }) {
+function FieldRow({ label, divider = true, children }: { label: string; divider?: boolean; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 border-b border-divider px-4 py-3 sm:flex-row sm:items-start sm:gap-4 sm:py-3.5">
+    <div
+      className={`flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4 sm:py-3.5 ${divider ? 'border-b border-divider' : ''}`}
+    >
       <span className="w-full shrink-0 pt-1.5 text-sm text-ink sm:w-24">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -182,8 +184,8 @@ export function ComposePage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
             <BackIcon />
@@ -230,8 +232,8 @@ export function ComposePage() {
 
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
 
-      <div className="border-t border-divider">
-        <FieldRow label="From">
+      <div>
+        <FieldRow label="From" divider={false}>
           <select className={fieldClass} value={senderId} onChange={(e) => setSenderId(e.target.value)} required>
             {senders.map((s) => (
               <option key={s.id} value={s.id}>
@@ -272,7 +274,7 @@ export function ComposePage() {
           <input className={fieldClass} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={191} />
         </FieldRow>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-divider px-4 py-3.5 text-sm text-ink sm:gap-x-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-3 px-4 py-3.5 text-sm text-ink sm:gap-x-3">
           <span>Delay between 2 emails</span>
           <input
             type="number"
@@ -294,12 +296,10 @@ export function ComposePage() {
         </div>
       </div>
 
-      <div className="mt-4">
-        <MessageEditor value={body} onChange={setBody} placeholder="Type Your Reply…" />
-      </div>
+      <MessageEditor value={body} onChange={setBody} placeholder="Type Your Reply…" />
 
       {attachments.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           {attachments.map((file, i) => (
             <div key={`${file.name}-${i}`} className="relative h-20 w-28 overflow-hidden rounded-lg">
               <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-cover" />
