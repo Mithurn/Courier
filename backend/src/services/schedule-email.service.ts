@@ -7,12 +7,13 @@ import { tryReserveDailyQuota, releaseDailyQuota } from '../rate-limit';
 import { indexEmails, type IndexableEmail } from '../es';
 
 export const MAX_RECIPIENTS = 5000;
+export const MAX_EMAIL_BODY_LENGTH = 1_000_000;
 const MAX_START_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const scheduleEmailSchema = z.object({
   senderId: z.string().min(1),
   subject: z.string().trim().min(1).max(191),
-  body: z.string().min(1).max(50_000),
+  body: z.string().min(1).max(MAX_EMAIL_BODY_LENGTH),
   recipients: z.array(z.string().trim().toLowerCase().email().max(191)).min(1).max(MAX_RECIPIENTS),
   startAt: z.coerce
     .date()

@@ -1,0 +1,1 @@
+ALTER TABLE `ScheduledEmail` MODIFY `body` MEDIUMTEXT NOT NULL;

@@ -32,6 +32,7 @@ authRouter.get('/google/callback', oauthLimiter, async (req, res) => {
 
   try {
     const profile = await exchangeCodeForProfile(code);
+    const existing = await prisma.user.findUnique({ where: { googleId: profile.id } });
     const user = await prisma.user.upsert({
       where: { googleId: profile.id },
       update: { name: profile.name, avatarUrl: profile.picture },
@@ -48,7 +49,8 @@ authRouter.get('/google/callback', oauthLimiter, async (req, res) => {
     }
 
     res.cookie(SESSION_COOKIE, signSession({ userId: user.id }), { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.redirect(`${env.FRONTEND_URL}/dashboard`);
+    const welcome = existing ? '' : '?welcome=1';
+    res.redirect(`${env.FRONTEND_URL}/dashboard${welcome}`);
   } catch (err) {
     console.error('Google login failed:', err);
     res.redirect(`${env.FRONTEND_URL}/login?error=google`);

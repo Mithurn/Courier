@@ -16,6 +16,7 @@ const pageSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
+const scheduledQuerySchema = pageSchema.extend({ status: z.enum(['scheduled', 'sending']).optional() });
 const sentQuerySchema = pageSchema.extend({ status: z.enum(['sent', 'failed']).optional() });
 const MAX_RESULT_WINDOW = 10_000;
 const searchQuerySchema = pageSchema
@@ -47,9 +48,10 @@ emailsRouter.post('/schedule', scheduleLimiter, async (req, res) => {
 });
 
 emailsRouter.get('/scheduled', async (req, res) => {
-  const parsed = pageSchema.safeParse(req.query);
+  const parsed = scheduledQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  res.json(await listScheduled(req.userId!, parsed.data));
+  const { status, ...page } = parsed.data;
+  res.json(await listScheduled(req.userId!, page, status));
 });
 
 emailsRouter.get('/sent', async (req, res) => {

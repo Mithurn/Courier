@@ -35,8 +35,8 @@ function toListItem(email: EmailWithSender) {
   };
 }
 
-export async function listScheduled(ownerId: string, { page, pageSize }: Page) {
-  const where = { status: { in: PENDING }, sender: { ownerId } };
+export async function listScheduled(ownerId: string, { page, pageSize }: Page, status?: 'scheduled' | 'sending') {
+  const where = { status: status ? status : { in: PENDING }, sender: { ownerId } };
   const [rows, total] = await Promise.all([
     prisma.scheduledEmail.findMany({
       where,

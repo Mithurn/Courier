@@ -18,7 +18,7 @@ export const app = express();
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
 app.use(helmet({ contentSecurityPolicy: { directives: { 'upgrade-insecure-requests': null } } }));
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
 app.get('/health', (_req, res) => {

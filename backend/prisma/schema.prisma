@@ -58,7 +58,7 @@ model ScheduledEmail {
   sender        Sender      @relation(fields: [senderId], references: [id])
   toEmail       String
   subject       String
-  body          String       @db.Text
+  body          String       @db.MediumText
   scheduledAt   DateTime
   delayMs       Int
   hourlyLimit   Int?
