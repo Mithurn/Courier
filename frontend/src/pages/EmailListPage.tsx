@@ -36,9 +36,9 @@ export function EmailListPage({ tab }: { tab: Tab }) {
   const [data, setData] = useState<Page<EmailListItem>>({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(() => {
-    const notice = (location.state as { notice?: string } | null)?.notice;
-    return notice ? { message: notice, variant: 'success' } : null;
+  const [toast, setToast] = useState<{ message: string; variant: 'scheduled' | 'success' | 'error' | 'info'; duration?: number } | null>(() => {
+    const state = location.state as { notice?: string; variant?: 'scheduled' | 'success' | 'error' | 'info' } | null;
+    return state?.notice ? { message: state.notice, variant: state.variant ?? 'scheduled', duration: 2000 } : null;
   });
 
   useEffect(() => {
@@ -104,22 +104,26 @@ export function EmailListPage({ tab }: { tab: Tab }) {
             setToast({
               message: `${sentCount} sent, ${failedCount} failed delivery`,
               variant: 'error',
+              duration: 4000,
             });
           } else if (failedCount > 0) {
             setToast({
               message: `${failedCount} email${failedCount > 1 ? 's' : ''} failed delivery`,
               variant: 'error',
+              duration: 4000,
             });
           } else {
             setToast({
               message: diff === 1 ? '1 email sent successfully!' : `${diff} emails sent successfully!`,
               variant: 'success',
+              duration: 4000,
             });
           }
         } catch {
           setToast({
             message: diff === 1 ? '1 email sent successfully!' : `${diff} emails sent successfully!`,
             variant: 'success',
+            duration: 4000,
           });
         }
       } else {
@@ -243,7 +247,14 @@ export function EmailListPage({ tab }: { tab: Tab }) {
         onToggleStar={toggleStar}
       />
 
-      {toast && <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />}
+      {toast && (
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          duration={toast.duration}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </>
   );
 }

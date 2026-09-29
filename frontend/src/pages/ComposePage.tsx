@@ -147,7 +147,12 @@ export function ComposePage() {
         delayBetweenSendsMs: delaySeconds ? Math.round(Number(delaySeconds) * 1000) : undefined,
         hourlyLimit: hourlyLimit ? Number(hourlyLimit) : undefined,
       });
-      navigate('/dashboard', { state: { notice: `Scheduled ${result.count} emails (hourly limit ${result.hourlyLimit}).` } });
+      navigate('/dashboard', {
+        state: {
+          notice: `Scheduled ${result.count} email${result.count > 1 ? 's' : ''} (hourly limit ${result.hourlyLimit}).`,
+          variant: 'scheduled',
+        },
+      });
     } catch (err) {
       setError((err as Error).message);
     } finally {
