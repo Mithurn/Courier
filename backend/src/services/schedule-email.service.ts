@@ -19,7 +19,12 @@ export const scheduleEmailSchema = z.object({
     .date()
     .refine((d) => d.getTime() - Date.now() < MAX_START_AHEAD_MS, 'startAt must be within a year')
     .optional(),
-  delayBetweenSendsMs: z.coerce.number().int().min(0).optional(),
+  delayBetweenSendsMs: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60 * 60 * 1000, 'delayBetweenSendsMs cannot exceed 24 hours')
+    .optional(),
   hourlyLimit: z.coerce.number().int().positive().optional(),
 });
 
