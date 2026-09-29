@@ -22,6 +22,16 @@ Bull Board is at `http://localhost:4000/admin/queues` (basic auth from `BULLBOAR
 
 API docs (OpenAPI/Swagger UI) are at `http://localhost:4000/docs`, spec at `http://localhost:4000/openapi.json`.
 
+## Run the frontend
+
+Requires Node 20 or newer.
+
+```bash
+cd frontend
+npm ci
+npm run dev                          # UI on http://localhost:5173
+```
+
 ### Environment
 
 | Variable | Purpose |
