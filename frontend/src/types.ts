@@ -4,6 +4,8 @@ export type User = { id: string; email: string; name: string; avatarUrl: string 
 
 export type Sender = { id: string; name: string; email: string; hourlyLimit: number };
 
+export type EmailLabel = 'starred' | 'archived' | 'trashed';
+
 export type EmailListItem = {
   id: string;
   from: string;
@@ -14,6 +16,9 @@ export type EmailListItem = {
   scheduledAt: string;
   sentAt: string | null;
   failReason: string | null;
+  starred: boolean;
+  archived: boolean;
+  trashed: boolean;
 };
 
 export type EmailDetail = EmailListItem & { body: string };

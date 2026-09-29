@@ -5,6 +5,8 @@ import type { Sender, User } from '../types';
 type AuthContextValue = {
   user: User | null | undefined;
   senders: Sender[];
+  sendersError: string;
+  retrySenders: () => void;
   logout: () => Promise<void>;
 };
 
@@ -13,6 +15,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [senders, setSenders] = useState<Sender[]>([]);
+  const [sendersError, setSendersError] = useState('');
+  const [sendersAttempt, setSendersAttempt] = useState(0);
 
   useEffect(() => {
     api.me().then(setUser).catch(() => setUser(null));
@@ -20,11 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
+    setSendersError('');
     api
       .senders()
       .then((list) => (list.length > 0 ? list : api.createSender().then((sender) => [sender])))
-      .then(setSenders);
-  }, [user]);
+      .then(setSenders)
+      .catch((err: Error) => setSendersError(err.message || 'Could not load senders'));
+  }, [user, sendersAttempt]);
 
   async function logout() {
     await api.logout();
@@ -32,7 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSenders([]);
   }
 
-  return <AuthContext.Provider value={{ user, senders, logout }}>{children}</AuthContext.Provider>;
+  const retrySenders = () => setSendersAttempt((n) => n + 1);
+
+  return (
+    <AuthContext.Provider value={{ user, senders, sendersError, retrySenders, logout }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

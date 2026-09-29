@@ -9,6 +9,8 @@ export const DEV_COUNTS: Counts = { scheduled: 2, sent: 3 };
 const scheduledAt = new Date(Date.now() + 86_400_000).toISOString();
 const sentAt = new Date(Date.now() - 3_600_000).toISOString();
 
+const flags = { starred: false, archived: false, trashed: false };
+
 export const DEV_SCHEDULED: EmailListItem[] = [
   {
     id: 'dev-scheduled-1',
@@ -20,6 +22,7 @@ export const DEV_SCHEDULED: EmailListItem[] = [
     scheduledAt,
     sentAt: null,
     failReason: null,
+    ...flags,
   },
   {
     id: 'dev-scheduled-2',
@@ -31,6 +34,7 @@ export const DEV_SCHEDULED: EmailListItem[] = [
     scheduledAt,
     sentAt: null,
     failReason: null,
+    ...flags,
   },
 ];
 
@@ -45,6 +49,7 @@ export const DEV_SENT: EmailListItem[] = [
     scheduledAt: sentAt,
     sentAt,
     failReason: null,
+    ...flags,
   },
   {
     id: 'dev-sent-2',
@@ -56,6 +61,7 @@ export const DEV_SENT: EmailListItem[] = [
     scheduledAt: sentAt,
     sentAt,
     failReason: null,
+    ...flags,
   },
   {
     id: 'dev-sent-3',
@@ -67,6 +73,7 @@ export const DEV_SENT: EmailListItem[] = [
     scheduledAt: sentAt,
     sentAt: null,
     failReason: 'Mailbox unavailable',
+    ...flags,
   },
 ];
 

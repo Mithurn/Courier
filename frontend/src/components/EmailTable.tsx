@@ -1,5 +1,6 @@
 import type { EmailListItem } from '../types';
 import { ScheduledClockIcon, StarIcon } from './icons';
+import { formatDateTime } from '../lib/format';
 
 export const statusStyles: Record<string, string> = {
   scheduled: 'bg-pill-scheduled-bg border-pill-scheduled-border text-pill-scheduled-text',
@@ -15,8 +16,7 @@ export const statusLabels: Record<string, string> = {
   failed: 'Failed',
 };
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+const formatTime = (iso: string) => formatDateTime(iso, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
 type Props = {
   items: EmailListItem[];
@@ -27,9 +27,10 @@ type Props = {
   timeField: 'scheduledAt' | 'sentAt';
   onPage: (page: number) => void;
   onOpen: (id: string) => void;
+  onToggleStar: (id: string, starred: boolean) => void;
 };
 
-export function EmailTable({ items, total, page, pageSize, loading, timeField, onPage, onOpen }: Props) {
+export function EmailTable({ items, total, page, pageSize, loading, timeField, onPage, onOpen, onToggleStar }: Props) {
   if (loading) return <p className="py-10 text-center text-muted">Loading…</p>;
   if (items.length === 0) return <p className="py-10 text-center text-muted">No emails here yet.</p>;
 
@@ -65,7 +66,18 @@ export function EmailTable({ items, total, page, pageSize, loading, timeField, o
                     {time}
                   </span>
                 )}
-                <StarIcon className="hidden shrink-0 text-icon sm:block" />
+                <button
+                  type="button"
+                  aria-label={email.starred ? 'Unstar' : 'Star'}
+                  aria-pressed={email.starred}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleStar(email.id, !email.starred);
+                  }}
+                  className={`hidden shrink-0 cursor-pointer sm:block ${email.starred ? 'text-brand' : 'text-icon hover:text-ink'}`}
+                >
+                  <StarIcon className={email.starred ? 'fill-current' : undefined} />
+                </button>
               </span>
             </li>
           );
