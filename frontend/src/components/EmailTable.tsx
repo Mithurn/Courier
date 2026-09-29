@@ -23,7 +23,7 @@ function formatScheduledTime(scheduledAtIso: string, now: number) {
   const target = new Date(scheduledAtIso).getTime();
   const diffSec = Math.round((target - now) / 1000);
 
-  if (diffSec <= 0) return 'Due now';
+  if (diffSec <= 3) return 'Scheduled';
   if (diffSec < 60) return `in ${diffSec}s`;
   if (diffSec < 3600) {
     const m = Math.floor(diffSec / 60);
