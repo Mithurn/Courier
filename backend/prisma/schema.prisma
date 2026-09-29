@@ -58,13 +58,16 @@ model ScheduledEmail {
   sender        Sender      @relation(fields: [senderId], references: [id])
   toEmail       String
   subject       String
-  body          String       @db.Text
+  body          String       @db.MediumText
   scheduledAt   DateTime
   delayMs       Int
   hourlyLimit   Int?
   status        EmailStatus  @default(scheduled)
   failReason    String?
   sentAt        DateTime?
+  starred       Boolean      @default(false)
+  archived      Boolean      @default(false)
+  trashed       Boolean      @default(false)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 

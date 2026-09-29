@@ -8,7 +8,7 @@ import {
   scheduleEmailSchema,
   SenderNotOwnedError,
 } from '../services/schedule-email.service';
-import { countByTab, getEmail, listScheduled, listSent, searchEmails } from '../services/email-list.service';
+import { countByTab, getEmail, listScheduled, listSent, searchEmails, setEmailFlags } from '../services/email-list.service';
 
 export const emailsRouter = Router();
 
@@ -16,7 +16,13 @@ const pageSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
-const sentQuerySchema = pageSchema.extend({ status: z.enum(['sent', 'failed']).optional() });
+const labelSchema = z.enum(['starred', 'archived', 'trashed']).optional();
+const scheduledQuerySchema = pageSchema.extend({ status: z.enum(['scheduled', 'sending']).optional(), label: labelSchema });
+const sentQuerySchema = pageSchema.extend({ status: z.enum(['sent', 'failed']).optional(), label: labelSchema });
+const flagsSchema = z
+  .object({ starred: z.boolean(), archived: z.boolean(), trashed: z.boolean() })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'At least one flag is required');
 const MAX_RESULT_WINDOW = 10_000;
 const searchQuerySchema = pageSchema
   .extend({ q: z.string().trim().max(200).default('') })
@@ -47,16 +53,17 @@ emailsRouter.post('/schedule', scheduleLimiter, async (req, res) => {
 });
 
 emailsRouter.get('/scheduled', async (req, res) => {
-  const parsed = pageSchema.safeParse(req.query);
+  const parsed = scheduledQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  res.json(await listScheduled(req.userId!, parsed.data));
+  const { status, label, ...page } = parsed.data;
+  res.json(await listScheduled(req.userId!, page, status, label));
 });
 
 emailsRouter.get('/sent', async (req, res) => {
   const parsed = sentQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { status, ...page } = parsed.data;
-  res.json(await listSent(req.userId!, page, status));
+  const { status, label, ...page } = parsed.data;
+  res.json(await listSent(req.userId!, page, status, label));
 });
 
 emailsRouter.get('/counts', async (req, res) => {
@@ -72,6 +79,14 @@ emailsRouter.get('/search', async (req, res) => {
 
 emailsRouter.get('/:id', async (req, res) => {
   const email = await getEmail(req.userId!, req.params.id);
+  if (!email) return res.sendStatus(404);
+  res.json(email);
+});
+
+emailsRouter.patch('/:id', async (req, res) => {
+  const parsed = flagsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const email = await setEmailFlags(req.userId!, req.params.id, parsed.data);
   if (!email) return res.sendStatus(404);
   res.json(email);
 });

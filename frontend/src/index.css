@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #1c1c1c;
+  --color-muted: #636970;
+  --color-icon: #99a1af;
+  --color-icon-muted: #888888;
+  --color-border: #e5e7eb;
+  --color-divider: #f3f4f6;
+  --color-surface: #f4f7f5;
+  --color-surface-soft: #fafafa;
+  --color-brand: #00a63e;
+  --color-brand-soft: #e5f6ec;
+
+  --color-pill-scheduled-bg: #ffedd4;
+  --color-pill-scheduled-border: #ffd6a7;
+  --color-pill-scheduled-text: #ca3500;
+
+  --color-pill-sent-bg: #f3f4f6;
+  --color-pill-sent-border: #e5e7eb;
+  --color-pill-sent-text: #4a5565;
+
+  --color-pill-sending-bg: #dbeafe;
+  --color-pill-sending-border: #bfdbfe;
+  --color-pill-sending-text: #1d4ed8;
+
+  --animate-clock-tick: clock-tick 4s steps(12) infinite;
+}
+
+@keyframes clock-tick {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer base {
+  button:not(:disabled),
+  a[href],
+  select,
+  label:has(input[type='file']),
+  label:has(input[type='datetime-local']) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-clock-tick {
+      animation: none !important;
+    }
+  }
+}

@@ -63,7 +63,7 @@ describe('access control', () => {
 describe('request validation', () => {
   it('answers 4xx, not 500, for bad input', async () => {
     assert.equal((await api.call(a.cookie, 'POST', '/emails/schedule', '{bad json')).status, 400);
-    assert.equal((await api.call(a.cookie, 'POST', '/emails/schedule', { x: 'y'.repeat(1_100_000) })).status, 413);
+    assert.equal((await api.call(a.cookie, 'POST', '/emails/schedule', { x: 'y'.repeat(6_000_000) })).status, 413);
     assert.equal((await api.call(a.cookie, 'POST', '/emails/schedule', batch(senderA.id, ['nope']))).status, 400);
     assert.equal((await api.call(a.cookie, 'GET', '/emails/scheduled?pageSize=1000')).status, 400);
     assert.equal((await api.call(a.cookie, 'GET', '/emails/search?page=600&pageSize=20')).status, 400);

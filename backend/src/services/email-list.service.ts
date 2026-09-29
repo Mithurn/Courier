@@ -6,6 +6,13 @@ const PREVIEW_LENGTH = 120;
 const PENDING: EmailStatus[] = ['scheduled', 'sending'];
 const FINISHED: EmailStatus[] = ['sent', 'failed'];
 
+export type Label = 'starred' | 'archived' | 'trashed';
+
+/** Default views hide archived/trashed emails; a label filter shows exactly that bucket instead. */
+function labelWhere(label?: Label) {
+  return label ? { [label]: true } : { archived: false, trashed: false };
+}
+
 type EmailWithSender = ScheduledEmail & { sender: Pick<Sender, 'smtpUser'> };
 
 const withSender = { sender: { select: { smtpUser: true } } } as const;
@@ -32,11 +39,14 @@ function toListItem(email: EmailWithSender) {
     scheduledAt: email.scheduledAt,
     sentAt: email.sentAt,
     failReason: email.failReason,
+    starred: email.starred,
+    archived: email.archived,
+    trashed: email.trashed,
   };
 }
 
-export async function listScheduled(ownerId: string, { page, pageSize }: Page) {
-  const where = { status: { in: PENDING }, sender: { ownerId } };
+export async function listScheduled(ownerId: string, { page, pageSize }: Page, status?: 'scheduled' | 'sending', label?: Label) {
+  const where = { status: status ? status : { in: PENDING }, sender: { ownerId }, ...labelWhere(label) };
   const [rows, total] = await Promise.all([
     prisma.scheduledEmail.findMany({
       where,
@@ -50,8 +60,8 @@ export async function listScheduled(ownerId: string, { page, pageSize }: Page) {
   return { items: rows.map(toListItem), total };
 }
 
-export async function listSent(ownerId: string, { page, pageSize }: Page, status?: 'sent' | 'failed') {
-  const where = { status: status ? status : { in: FINISHED }, sender: { ownerId } };
+export async function listSent(ownerId: string, { page, pageSize }: Page, status?: 'sent' | 'failed', label?: Label) {
+  const where = { status: status ? status : { in: FINISHED }, sender: { ownerId }, ...labelWhere(label) };
   const [rows, total] = await Promise.all([
     prisma.scheduledEmail.findMany({
       where,
@@ -67,10 +77,21 @@ export async function listSent(ownerId: string, { page, pageSize }: Page, status
 
 export async function countByTab(ownerId: string) {
   const [scheduled, sent] = await Promise.all([
-    prisma.scheduledEmail.count({ where: { status: { in: PENDING }, sender: { ownerId } } }),
-    prisma.scheduledEmail.count({ where: { status: { in: FINISHED }, sender: { ownerId } } }),
+    prisma.scheduledEmail.count({ where: { status: { in: PENDING }, sender: { ownerId }, ...labelWhere() } }),
+    prisma.scheduledEmail.count({ where: { status: { in: FINISHED }, sender: { ownerId }, ...labelWhere() } }),
   ]);
   return { scheduled, sent };
+}
+
+export async function setEmailFlags(
+  ownerId: string,
+  id: string,
+  flags: Partial<Record<Label, boolean>>,
+): Promise<ReturnType<typeof toListItem> | null> {
+  const existing = await prisma.scheduledEmail.findFirst({ where: { id, sender: { ownerId } } });
+  if (!existing) return null;
+  const email = await prisma.scheduledEmail.update({ where: { id }, data: flags, include: withSender });
+  return toListItem(email);
 }
 
 export async function getEmail(ownerId: string, id: string) {
