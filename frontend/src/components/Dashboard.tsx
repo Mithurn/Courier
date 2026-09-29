@@ -4,7 +4,9 @@ import type { Counts, EmailListItem, Page, ScheduleResult, Sender, User } from '
 import { ComposeForm } from './ComposeForm';
 import { EmailDetailModal } from './EmailDetailModal';
 import { EmailTable } from './EmailTable';
-import { Button, ErrorBanner } from './ui';
+import { ErrorBanner } from './ui';
+import { Sidebar } from './Sidebar';
+import { FilterIcon, MenuIcon, RefreshIcon, SearchIcon } from './icons';
 
 type Tab = 'scheduled' | 'sent';
 const PAGE_SIZE = 10;
@@ -22,6 +24,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
   const [notice, setNotice] = useState('');
   const [composing, setComposing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,31 +74,30 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <header className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
-        <span className="text-xl font-bold tracking-widest">ONB</span>
-        <div className="flex items-center gap-4 text-sm">
-          {slack.connected ? (
-            <button onClick={disconnectSlack} className="text-gray-600 underline">
-              Slack: {slack.teamName} (disconnect)
-            </button>
-          ) : (
-            <a href="/api/auth/slack" className="text-green-700 underline">
-              Connect Slack
-            </a>
-          )}
-          {user.avatarUrl && <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full" />}
-          <div className="leading-tight">
-            <div className="font-medium">{user.name}</div>
-            <div className="text-xs text-gray-500">{user.email}</div>
-          </div>
-          <Button variant="ghost" onClick={onLogout}>
-            Logout
-          </Button>
-        </div>
-      </header>
+    <div className="flex min-h-screen bg-white text-[#1C1C1C]">
+      <Sidebar
+        user={user}
+        counts={counts}
+        tab={tab}
+        query={query}
+        senderReady={senders.length > 0}
+        slack={slack}
+        open={sidebarOpen}
+        onChangeTab={changeTab}
+        onCompose={() => setComposing(true)}
+        onDisconnectSlack={disconnectSlack}
+        onLogout={onLogout}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <main className="mx-auto max-w-5xl px-6 py-6">
+      <main className="min-w-0 flex-1 p-3 sm:p-4">
+        <div className="mb-3 flex items-center gap-3 md:hidden">
+          <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" className="rounded-full p-1.5 text-[#1C1C1C] hover:bg-[#F4F7F5]">
+            <MenuIcon />
+          </button>
+          <span className="text-sm font-medium capitalize">{query ? 'Search results' : tab}</span>
+        </div>
+
         {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
         {notice && (
           <div className="mb-4 flex items-center justify-between rounded-lg bg-green-50 px-4 py-2 text-sm text-green-800">
@@ -106,36 +108,36 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
           </div>
         )}
 
-        <div className="mb-4 flex items-center gap-3">
-          <Button onClick={() => setComposing(true)} disabled={senders.length === 0}>
-            Compose New Email
-          </Button>
-          <input
-            value={query}
-            onChange={(e) => {
-              setPage(1);
-              setQuery(e.target.value);
-            }}
-            placeholder="Search scheduled and sent emails"
-            className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm focus:outline-none"
-          />
-          <Button variant="ghost" onClick={load}>
-            Refresh
-          </Button>
+        <div className="flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+          <div className="flex h-[38px] min-w-0 flex-1 items-center gap-1.5 rounded-full bg-[#F4F7F5] px-4">
+            <SearchIcon className="shrink-0 text-[#99A1AF]" />
+            <input
+              value={query}
+              onChange={(e) => {
+                setPage(1);
+                setQuery(e.target.value);
+              }}
+              placeholder="Search scheduled and sent emails"
+              className="w-full min-w-0 bg-transparent text-sm text-[#1C1C1C] placeholder:text-[#99A1AF] focus:outline-none"
+            />
+          </div>
+          <button
+            disabled
+            title="Filtering is not available yet"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#99A1AF] disabled:cursor-not-allowed"
+          >
+            <FilterIcon />
+          </button>
+          <button
+            onClick={load}
+            title="Refresh"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#99A1AF] hover:bg-[#F4F7F5]"
+          >
+            <RefreshIcon />
+          </button>
         </div>
 
-        <nav className="mb-2 flex gap-6 border-b border-gray-200 text-sm">
-          {(['scheduled', 'sent'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => changeTab(t)}
-              className={`-mb-px border-b-2 px-1 pb-2 capitalize ${tab === t && !query ? 'border-green-600 font-medium text-green-700' : 'border-transparent text-gray-500'}`}
-            >
-              {t} ({counts[t]})
-            </button>
-          ))}
-          {query && <span className="pb-2 text-gray-500">Search results ({data.total})</span>}
-        </nav>
+        {query && <div className="px-4 py-2 text-sm text-[#636970]">Search results ({data.total})</div>}
 
         <EmailTable
           items={data.items}
