@@ -1,10 +1,9 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useEffect } from 'react';
+import type { ButtonHTMLAttributes } from 'react';
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' }) {
   const styles =
-    variant === 'primary'
-      ? 'bg-green-600 text-white hover:bg-green-700'
-      : 'border border-green-600 text-green-700 hover:bg-green-50';
+    variant === 'primary' ? 'bg-brand text-white hover:opacity-90' : 'border border-brand text-brand hover:bg-brand-soft';
   return (
     <button
       className={`rounded-full px-4 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
@@ -13,18 +12,18 @@ export function Button({ variant = 'primary', className = '', ...props }: Button
   );
 }
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
   return (
-    <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="mt-8 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-500 hover:text-gray-800" aria-label="Close">
-            ×
-          </button>
-        </div>
-        {children}
-      </div>
+    <div className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-lg bg-ink px-4 py-3 text-sm text-white shadow-lg">
+      <span>{message}</span>
+      <button onClick={onDismiss} className="text-white/60 hover:text-white" aria-label="Dismiss">
+        ×
+      </button>
     </div>
   );
 }

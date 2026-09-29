@@ -14,24 +14,24 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white p-4">
-      <div className="flex w-full max-w-[496px] flex-col items-center justify-center rounded-[10px] border border-[#E5E7EB] px-6 py-10 sm:h-[494px] sm:px-0 sm:py-0">
+      <div className="flex w-full max-w-[496px] flex-col items-center justify-center rounded-[10px] border border-border px-6 py-10 sm:h-123.5 sm:px-0 sm:py-0">
         <div className="flex w-full max-w-[380px] flex-col gap-7">
-          <h1 className="text-center text-3xl font-semibold leading-none text-[#1C1C1C] sm:text-[38px]">Login</h1>
+          <h1 className="text-center text-3xl font-semibold leading-none text-ink sm:text-[38px]">Login</h1>
 
           {failed && <p className="text-center text-sm text-red-600">Google login failed, please try again.</p>}
 
           <div className="flex w-full flex-col gap-6">
             <a
               href="/api/auth/google"
-              className="flex h-[54px] items-center justify-center gap-3 rounded-[10px] bg-[#E5F6EC] text-sm font-medium text-[#1C1C1C]"
+              className="flex h-[54px] items-center justify-center gap-3 rounded-[10px] bg-brand-soft text-sm font-medium text-ink"
             >
               <GoogleIcon />
               Login with Google
             </a>
-            <div className="flex items-center gap-3 text-xs text-[#636970]">
-              <span className="h-px flex-1 bg-[#E5E7EB]" />
+            <div className="flex items-center gap-3 text-xs text-muted">
+              <span className="h-px flex-1 bg-border" />
               or sign up through email
-              <span className="h-px flex-1 bg-[#E5E7EB]" />
+              <span className="h-px flex-1 bg-border" />
             </div>
           </div>
 
@@ -41,14 +41,14 @@ export function LoginPage() {
               placeholder="Email ID"
               disabled
               title="This build only supports Google login"
-              className="h-14 w-full rounded-[10px] bg-[#F4F7F5] px-2 text-sm text-[#636970] placeholder:text-[#636970] disabled:cursor-not-allowed"
+              className="h-14 w-full rounded-[10px] bg-surface px-2 text-sm text-muted placeholder:text-muted disabled:cursor-not-allowed"
             />
             <input
               type="password"
               placeholder="Password"
               disabled
               title="This build only supports Google login"
-              className="h-14 w-full rounded-[10px] bg-[#F4F7F5] px-2 text-sm text-[#636970] placeholder:text-[#636970] disabled:cursor-not-allowed"
+              className="h-14 w-full rounded-[10px] bg-surface px-2 text-sm text-muted placeholder:text-muted disabled:cursor-not-allowed"
             />
           </div>
 
@@ -56,7 +56,7 @@ export function LoginPage() {
             type="button"
             disabled
             title="This build only supports Google login"
-            className="h-12 w-full rounded-xl bg-[#00A63E] text-base font-normal tracking-[-0.3px] text-white disabled:cursor-not-allowed disabled:opacity-70"
+            className="h-12 w-full rounded-xl bg-brand text-base font-normal tracking-[-0.3px] text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             Login
           </button>

@@ -1,1 +1,24 @@
 @import 'tailwindcss';
+
+@theme {
+  --color-ink: #1c1c1c;
+  --color-muted: #636970;
+  --color-icon: #99a1af;
+  --color-border: #e5e7eb;
+  --color-divider: #f3f4f6;
+  --color-surface: #f4f7f5;
+  --color-brand: #00a63e;
+  --color-brand-soft: #e5f6ec;
+
+  --color-pill-scheduled-bg: #ffedd4;
+  --color-pill-scheduled-border: #ffd6a7;
+  --color-pill-scheduled-text: #ca3500;
+
+  --color-pill-sent-bg: #f3f4f6;
+  --color-pill-sent-border: #e5e7eb;
+  --color-pill-sent-text: #4a5565;
+
+  --color-pill-sending-bg: #dbeafe;
+  --color-pill-sending-border: #bfdbfe;
+  --color-pill-sending-text: #1d4ed8;
+}
