@@ -11,7 +11,7 @@ export async function requeueScheduledEmails(): Promise<number> {
   for (;;) {
     const rows = await prisma.scheduledEmail.findMany({
       where: { status: 'scheduled' },
-      select: { id: true, scheduledAt: true },
+      select: { id: true, scheduledAt: true, toEmail: true, subject: true },
       orderBy: { id: 'asc' },
       take: BATCH_SIZE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -22,7 +22,7 @@ export async function requeueScheduledEmails(): Promise<number> {
     await emailQueue.addBulk(
       rows.map((row) => ({
         name: EmailJob.SEND,
-        data: { emailId: row.id },
+        data: { emailId: row.id, toEmail: row.toEmail, subject: row.subject },
         opts: { jobId: row.id, delay: Math.max(0, row.scheduledAt.getTime() - now) },
       })),
     );

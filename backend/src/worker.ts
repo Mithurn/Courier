@@ -35,25 +35,38 @@ const worker = new Worker<EmailJobData>(
       where: { id: job.data.emailId },
       include: { sender: true },
     });
-    if (!email) return; // deleted or bad data, nothing to do
+    if (!email) {
+      await job.log('Email record not found in database; skipping.');
+      return { skipped: true, reason: 'not_found' };
+    }
 
-    if (email.status !== 'scheduled') return; // already handled, idempotent no-op
+    if (email.status !== 'scheduled') {
+      await job.log(`Email status is already '${email.status}'; idempotent no-op.`);
+      return { skipped: true, status: email.status };
+    }
+
+    await job.updateProgress(15);
+    await job.log(`Starting delivery to ${email.toEmail} via ${email.sender.smtpUser}`);
 
     // Pacing before rate limit, so a paced retry never inflates the hourly count.
     const paceDelay = await tryClaimSendSlot(email.senderId, email.delayMs);
     if (paceDelay > 0) {
+      await job.log(`Pacing delay active: sender slot busy, waiting ${paceDelay}ms`);
       await job.moveToDelayed(Date.now() + paceDelay, token);
       throw new DelayedError();
     }
 
+    await job.updateProgress(35);
     const hourlyLimit = email.hourlyLimit ?? email.sender.hourlyLimit;
     const { allowed, retryAt } = await tryConsumeHourlySlot(email.senderId, hourlyLimit, email.scheduledAt);
     if (!allowed) {
+      await job.log(`Hourly limit reached (${hourlyLimit}/hr). Deferred to ${new Date(retryAt).toISOString()}`);
       if (await claimRateLimitAlert(email.senderId)) {
         await notifyRateLimitHit(
           email.sender.ownerId,
           `:warning: *${email.sender.name}* hit its hourly limit (${hourlyLimit}/hr). Remaining emails are rescheduled into the next window.`,
         );
+        await job.log('Sent live Slack rate-limit alert.');
       }
       await job.moveToDelayed(retryAt, token);
       throw new DelayedError();
@@ -63,17 +76,27 @@ const worker = new Worker<EmailJobData>(
       where: { id: email.id, status: 'scheduled' },
       data: { status: 'sending' },
     });
-    if (locked.count === 0) return; // another worker/attempt already took it
+    if (locked.count === 0) {
+      await job.log('Row lock failed: another worker claimed this email.');
+      return { skipped: true, reason: 'concurrency_lock' };
+    }
 
+    await job.updateProgress(60);
+    await job.log('Claimed DB status "sending"; dispatching SMTP message...');
+
+    let messageId: string | undefined;
     try {
-      await transporterFor(email.sender).sendMail({
+      const info = await transporterFor(email.sender).sendMail({
         from: email.sender.smtpUser,
         to: email.toEmail,
         subject: email.subject,
         html: email.body,
       });
+      messageId = info.messageId;
+      await job.log(`SMTP accepted message: Message-ID ${info.messageId}`);
     } catch (err) {
       const attemptsExhausted = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+      await job.log(`SMTP send failed: ${(err as Error).message} (attempt ${job.attemptsMade + 1})`);
       const failed = await prisma.scheduledEmail.update({
         where: { id: email.id },
         data: attemptsExhausted
@@ -84,7 +107,19 @@ const worker = new Worker<EmailJobData>(
       throw err;
     }
 
+    await job.updateProgress(85);
     await recordSent(email.id);
+    await job.updateProgress(100);
+    await job.log('Delivered successfully: updated status to "sent" and indexed in Elasticsearch.');
+
+    return {
+      emailId: email.id,
+      to: email.toEmail,
+      subject: email.subject,
+      messageId,
+      sentAt: new Date().toISOString(),
+      attempts: job.attemptsMade + 1,
+    };
   },
   { connection: redis, concurrency: env.WORKER_CONCURRENCY },
 );

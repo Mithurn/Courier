@@ -65,7 +65,7 @@ export async function scheduleEmails(input: ScheduleEmailInput, ownerId: string)
     await emailQueue.addBulk(
       rows.map((row) => ({
         name: EmailJob.SEND,
-        data: { emailId: row.id },
+        data: { emailId: row.id, subject: row.subject, toEmail: row.toEmail },
         opts: { jobId: row.id, delay: Math.max(0, row.scheduledAt.getTime() - now) },
       })),
     );

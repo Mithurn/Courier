@@ -10,6 +10,8 @@ export enum EmailJob {
 
 export type EmailJobData = {
   emailId: string;
+  toEmail?: string;
+  subject?: string;
 };
 
 export const emailQueue = new Queue<EmailJobData>(QUEUE_NAME, {
