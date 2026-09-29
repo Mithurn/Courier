@@ -184,7 +184,7 @@ export function ComposePage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 p-4 sm:p-6">
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigate(-1)} aria-label="Back" className="rounded-full p-1 text-ink hover:bg-surface">
