@@ -3,63 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { SendLaterPopover } from '../components/SendLaterPopover';
 import { Button, ErrorBanner, Spinner } from '../components/ui';
-import { AttachmentIcon, BackIcon, CalendarIcon, ChevronDownIcon, ClockIcon, UploadIcon } from '../components/icons';
+import { AttachmentIcon, BackIcon, ChevronDownIcon, ClockIcon, UploadIcon } from '../components/icons';
 import { MessageEditor } from '../components/MessageEditor';
+import { fileToDataUrl, prepareImageAttachment } from '../lib/imageAttachments';
+import { formatFileSize } from '../lib/format';
+import { isDevFixtures as mockFixtures } from '../lib/env';
 
-const mockFixtures = import.meta.env.DEV && import.meta.env.VITE_DEV_FIXTURES === 'true';
 const MAX_EMAIL_BODY_LENGTH = 900_000;
-const MAX_ATTACHMENT_BYTES = 120_000;
+const MAX_RECIPIENTS = 5000;
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
 const extractEmails = (text: string) => [...new Set((text.match(EMAIL_PATTERN) ?? []).map((e) => e.toLowerCase()))];
 
 const isBodyEmpty = (html: string) => html.replace(/<[^>]*>/g, '').trim().length === 0;
-
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-function canvasToJpeg(canvas: HTMLCanvasElement, quality: number) {
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('Could not compress image.'))), 'image/jpeg', quality),
-  );
-}
-
-async function prepareImageAttachment(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error(`${file.name}: use JPG or PNG. HEIC is not supported in the browser.`);
-  });
-
-  try {
-    let maxDim = 1024;
-    while (maxDim >= 320) {
-      const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Could not process image.');
-      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-      for (let quality = 0.82; quality >= 0.45; quality -= 0.08) {
-        const blob = await canvasToJpeg(canvas, quality);
-        if (blob.size <= MAX_ATTACHMENT_BYTES) {
-          const base = file.name.replace(/\.[^.]+$/, '') || 'image';
-          return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
-        }
-      }
-      maxDim = Math.round(maxDim * 0.75);
-    }
-    throw new Error(`${file.name} is too large. Try a smaller image.`);
-  } finally {
-    bitmap.close();
-  }
-}
 
 function FieldRow({ label, divider = true, children }: { label: string; divider?: boolean; children: ReactNode }) {
   return (
@@ -72,99 +30,8 @@ function FieldRow({ label, divider = true, children }: { label: string; divider?
 
 const fieldClass = 'w-full min-w-0 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none';
 
-const SEND_LATER_PRESETS = [
-  { label: 'Tomorrow', hour: 9 },
-  { label: 'Tomorrow, 10:00 AM', hour: 10 },
-  { label: 'Tomorrow, 11:00 AM', hour: 11 },
-  { label: 'Tomorrow, 3:00 PM', hour: 15 },
-];
-
-function tomorrowAt(hour: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(hour, 0, 0, 0);
-  return d;
-}
-
-function toLocalInputValue(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function formatPickedDate(value: string) {
-  const date = new Date(value);
-  return date.toLocaleString(undefined, {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function SendLaterPopover({
-  startAt,
-  onPick,
-  onClose,
-}: {
-  startAt: string;
-  onPick: (iso: string) => void;
-  onClose: () => void;
-}) {
-  const [draft, setDraft] = useState(startAt);
-
-  return (
-    <div className="absolute right-0 top-full z-20 mt-2 flex h-[364px] w-[318px] max-w-[calc(100vw-2rem)] flex-col rounded-[10px] border border-border bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
-      <p className="text-sm font-semibold text-ink">Send Later</p>
-
-      <label className="relative mt-4 flex cursor-pointer items-center justify-between border-b border-divider pb-3">
-        <span className={`text-sm ${draft ? 'text-ink' : 'text-muted'}`}>
-          {draft ? formatPickedDate(draft) : 'Pick date & time'}
-        </span>
-        <CalendarIcon className="pointer-events-none shrink-0 text-icon" />
-        <input
-          type="datetime-local"
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-      </label>
-
-      <ul className="mt-4 flex flex-col gap-3">
-        {SEND_LATER_PRESETS.map((preset) => (
-          <li key={preset.label}>
-            <button
-              type="button"
-              className="cursor-pointer text-left text-sm text-muted hover:text-ink"
-              onClick={() => setDraft(toLocalInputValue(tomorrowAt(preset.hour)))}
-            >
-              {preset.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-auto flex justify-end gap-4 pt-4 text-sm">
-        <button type="button" className="cursor-pointer font-medium text-ink" onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="cursor-pointer rounded-full border border-brand px-4 py-1 font-medium text-brand hover:bg-brand-soft"
-          onClick={() => {
-            onPick(draft);
-            onClose();
-          }}
-        >
-          Done
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function ComposePage() {
-  const { senders, user } = useAuth();
+  const { senders, user, sendersError, retrySenders } = useAuth();
   const navigate = useNavigate();
 
   const [senderId, setSenderId] = useState(senders[0]?.id ?? '');
@@ -202,7 +69,14 @@ export function ComposePage() {
   function addRecipients(text: string) {
     const found = extractEmails(text);
     if (found.length === 0) return false;
-    setRecipients((current) => [...new Set([...current, ...found])]);
+    setRecipients((current) => {
+      const merged = [...new Set([...current, ...found])];
+      if (merged.length > MAX_RECIPIENTS) {
+        setError(`Recipient list is capped at ${MAX_RECIPIENTS.toLocaleString()} addresses.`);
+        return merged.slice(0, MAX_RECIPIENTS);
+      }
+      return merged;
+    });
     return true;
   }
 
@@ -366,7 +240,14 @@ export function ComposePage() {
 
         <div className="flex w-full flex-col gap-4">
           <FieldRow label="From" divider={false}>
-            {sendersLoading ? (
+            {sendersError ? (
+              <span className="flex items-center gap-2 text-sm text-red-600">
+                {sendersError}
+                <button type="button" onClick={retrySenders} className="cursor-pointer font-medium text-brand underline">
+                  Retry
+                </button>
+              </span>
+            ) : sendersLoading ? (
               <span className="flex items-center gap-2 text-sm text-muted">
                 <Spinner />
                 Loading senders…
@@ -444,6 +325,7 @@ export function ComposePage() {
             <input
               type="number"
               min={0}
+              max={86_400}
               step="any"
               placeholder="00"
               className="w-[70px] rounded-lg border border-border px-2.5 py-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
@@ -467,26 +349,29 @@ export function ComposePage() {
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-3">
             {attachments.map((file, i) => (
-              <div
-                key={`${file.name}-${i}`}
-                className="relative h-[169px] w-[210px] shrink-0 overflow-hidden rounded-[10px] border border-border"
-              >
-                <button
-                  type="button"
-                  onClick={() => setPreview({ src: attachmentUrls[i], alt: file.name })}
-                  className="block h-full w-full cursor-pointer"
-                  aria-label={`Preview ${file.name}`}
-                >
-                  <img src={attachmentUrls[i]} alt={file.name} className="h-full w-full object-cover" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAttachments((current) => current.filter((_, idx) => idx !== i))}
-                  aria-label={`Remove ${file.name}`}
-                  className="absolute right-2 top-2 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-ink/60 text-xs text-white hover:bg-ink/80"
-                >
-                  ×
-                </button>
+              <div key={`${file.name}-${i}`} className="w-[210px] shrink-0 overflow-hidden rounded-[10px] border border-border">
+                <div className="relative h-[117px] w-[210px]">
+                  <button
+                    type="button"
+                    onClick={() => setPreview({ src: attachmentUrls[i], alt: file.name })}
+                    className="block h-full w-full cursor-pointer"
+                    aria-label={`Preview ${file.name}`}
+                  >
+                    <img src={attachmentUrls[i]} alt={file.name} className="h-full w-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttachments((current) => current.filter((_, idx) => idx !== i))}
+                    aria-label={`Remove ${file.name}`}
+                    className="absolute right-2 top-2 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-ink/60 text-xs text-white hover:bg-ink/80"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex flex-col gap-0.5 border-t border-divider bg-surface-soft px-2.5 py-2">
+                  <p className="truncate text-sm font-medium leading-5 tracking-[-0.15px] text-ink">{file.name}</p>
+                  <p className="text-xs leading-4 text-muted">{formatFileSize(file.size)}</p>
+                </div>
               </div>
             ))}
           </div>
