@@ -9,7 +9,6 @@ import { AttachmentIcon, BackIcon, ChevronDownIcon, ClockIcon, UploadIcon } from
 import { MessageEditor } from '../components/MessageEditor';
 import { fileToDataUrl, prepareImageAttachment } from '../lib/imageAttachments';
 import { formatFileSize } from '../lib/format';
-import { isDevFixtures as mockFixtures } from '../lib/env';
 
 const MAX_EMAIL_BODY_LENGTH = 900_000;
 const MAX_RECIPIENTS = 5000;
@@ -35,10 +34,10 @@ export function ComposePage() {
   const navigate = useNavigate();
 
   const [senderId, setSenderId] = useState(senders[0]?.id ?? '');
-  const [recipients, setRecipients] = useState<string[]>(mockFixtures ? ['recipient@example.com'] : []);
+  const [recipients, setRecipients] = useState<string[]>([]);
   const [recipientDraft, setRecipientDraft] = useState('');
-  const [subject, setSubject] = useState(mockFixtures ? 'Demo subject' : '');
-  const [body, setBody] = useState(mockFixtures ? '<p>Demo message for local UI review.</p>' : '');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
   const [startAt, setStartAt] = useState('');
   const [delaySeconds, setDelaySeconds] = useState('');
   const [hourlyLimit, setHourlyLimit] = useState('');

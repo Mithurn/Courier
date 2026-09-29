@@ -34,7 +34,11 @@ const statusOf = (toEmail: string) => prisma.scheduledEmail.findFirst({ where: {
 const deferredToNextHour = async () => {
   const delayed = await redis.zrange(`bull:${QUEUE_NAME}:delayed`, 0, -1, 'WITHSCORES');
   let count = 0;
-  for (let i = 1; i < delayed.length; i += 2) if (Math.floor(Number(delayed[i]) / 4096) > Date.now() + 10 * 60 * 1000) count++;
+  const boundary = Math.ceil(Date.now() / HOUR_MS) * HOUR_MS;
+  for (let i = 1; i < delayed.length; i += 2) {
+    const runAt = Math.floor(Number(delayed[i]) / 4096);
+    if (Math.abs(runAt - boundary) < 10_000 || Math.abs(runAt - (boundary - HOUR_MS)) < 10_000) count++;
+  }
   return count;
 };
 const soon = (ms = 300) => new Date(Date.now() + ms).toISOString();
