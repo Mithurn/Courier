@@ -10,7 +10,8 @@ export const api = {
   createSender: () => request<Sender>('/senders', { method: 'POST', body: '{}' }),
   counts: () => request<Counts>('/emails/counts'),
   scheduled: (page: number) => request<Page<EmailListItem>>(`/emails/scheduled?page=${page}&pageSize=10`),
-  sent: (page: number) => request<Page<EmailListItem>>(`/emails/sent?page=${page}&pageSize=10`),
+  sent: (page: number, status?: 'sent' | 'failed') =>
+    request<Page<EmailListItem>>(`/emails/sent?page=${page}&pageSize=10${status ? `&status=${status}` : ''}`),
   search: (q: string, page: number) =>
     request<Page<EmailListItem>>(`/emails/search?q=${encodeURIComponent(q)}&page=${page}&pageSize=10`),
   detail: (id: string) => request<EmailDetail>(`/emails/${id}`),

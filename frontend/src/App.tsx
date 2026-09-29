@@ -1,23 +1,29 @@
-import { useEffect, useState } from 'react';
-import { api } from './api';
-import { Dashboard } from './components/Dashboard';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import { RequireAuth } from './components/RequireAuth';
+import { DashboardLayout } from './components/DashboardLayout';
+import { EmailListPage } from './pages/EmailListPage';
+import { ComposePage } from './pages/ComposePage';
+import { EmailDetailPage } from './pages/EmailDetailPage';
 import { LoginPage } from './components/LoginPage';
-import type { User } from './types';
 
 export function App() {
-  const [user, setUser] = useState<User | null | undefined>(undefined);
-
-  useEffect(() => {
-    api.me().then(setUser).catch(() => setUser(null));
-  }, []);
-
-  async function logout() {
-    await api.logout();
-    setUser(null);
-    window.history.replaceState({}, '', '/login');
-  }
-
-  if (user === undefined) return <p className="p-10 text-center text-gray-500">Loading…</p>;
-  if (user === null) return <LoginPage />;
-  return <Dashboard user={user} onLogout={logout} />;
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<RequireAuth />}>
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<EmailListPage tab="scheduled" />} />
+              <Route path="sent" element={<EmailListPage tab="sent" />} />
+            </Route>
+            <Route path="/compose" element={<ComposePage />} />
+            <Route path="/email/:id" element={<EmailDetailPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }

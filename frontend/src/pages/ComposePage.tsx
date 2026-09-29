@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { ScheduleResult, Sender } from '../types';
-import { Button, Modal } from './ui';
+import { useAuth } from '../context/AuthContext';
+import { Button } from '../components/ui';
 
 const EMAIL_PATTERN = /[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g;
 
@@ -14,15 +15,12 @@ const toHtml = (text: string) =>
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
 
-const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-600 focus:outline-none';
+const inputClass = 'w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand focus:outline-none';
 
-type Props = {
-  senders: Sender[];
-  onClose: () => void;
-  onScheduled: (result: ScheduleResult) => void;
-};
+export function ComposePage() {
+  const { senders } = useAuth();
+  const navigate = useNavigate();
 
-export function ComposeForm({ senders, onClose, onScheduled }: Props) {
   const [senderId, setSenderId] = useState(senders[0]?.id ?? '');
   const [recipientsText, setRecipientsText] = useState('');
   const [subject, setSubject] = useState('');
@@ -55,7 +53,7 @@ export function ComposeForm({ senders, onClose, onScheduled }: Props) {
         delayBetweenSendsMs: delaySeconds ? Math.round(Number(delaySeconds) * 1000) : undefined,
         hourlyLimit: hourlyLimit ? Number(hourlyLimit) : undefined,
       });
-      onScheduled(result);
+      navigate('/dashboard', { state: { notice: `Scheduled ${result.count} emails (hourly limit ${result.hourlyLimit}).` } });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -64,11 +62,18 @@ export function ComposeForm({ senders, onClose, onScheduled }: Props) {
   }
 
   return (
-    <Modal title="Compose New Email" onClose={onClose}>
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="text-xl text-muted hover:text-ink" aria-label="Back">
+          ←
+        </button>
+        <h1 className="text-lg font-semibold text-ink">Compose New Email</h1>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <label className="block text-sm">
-          <span className="mb-1 block text-gray-600">From</span>
+          <span className="mb-1 block text-muted">From</span>
           <select className={inputClass} value={senderId} onChange={(e) => setSenderId(e.target.value)} required>
             {senders.map((s) => (
               <option key={s.id} value={s.id}>
@@ -78,9 +83,9 @@ export function ComposeForm({ senders, onClose, onScheduled }: Props) {
           </select>
         </label>
         <label className="block text-sm">
-          <span className="mb-1 flex items-center justify-between text-gray-600">
+          <span className="mb-1 flex items-center justify-between text-muted">
             <span>To ({recipients.length} detected)</span>
-            <span className="text-green-700">
+            <span className="text-brand">
               Upload list{' '}
               <input type="file" accept=".csv,.txt" onChange={(e) => handleFile(e.target.files?.[0])} className="text-xs" />
             </span>
@@ -93,29 +98,29 @@ export function ComposeForm({ senders, onClose, onScheduled }: Props) {
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-gray-600">Subject</span>
+          <span className="mb-1 block text-muted">Subject</span>
           <input className={inputClass} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={191} />
         </label>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label className="block text-sm">
-            <span className="mb-1 block text-gray-600">Start time (blank = now)</span>
+            <span className="mb-1 block text-muted">Start time (blank = now)</span>
             <input type="datetime-local" className={inputClass} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-gray-600">Delay between emails (s)</span>
+            <span className="mb-1 block text-muted">Delay between emails (s)</span>
             <input type="number" min={0} step="any" className={inputClass} value={delaySeconds} onChange={(e) => setDelaySeconds(e.target.value)} />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-gray-600">Hourly limit</span>
+            <span className="mb-1 block text-muted">Hourly limit</span>
             <input type="number" min={1} className={inputClass} value={hourlyLimit} onChange={(e) => setHourlyLimit(e.target.value)} placeholder="sender default" />
           </label>
         </div>
         <label className="block text-sm">
-          <span className="mb-1 block text-gray-600">Message</span>
+          <span className="mb-1 block text-muted">Message</span>
           <textarea className={`${inputClass} h-40`} value={body} onChange={(e) => setBody(e.target.value)} required />
         </label>
         <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
             Cancel
           </Button>
           <Button type="submit" disabled={submitting || recipients.length === 0 || !senderId}>
@@ -123,6 +128,6 @@ export function ComposeForm({ senders, onClose, onScheduled }: Props) {
           </Button>
         </div>
       </form>
-    </Modal>
+    </div>
   );
 }
