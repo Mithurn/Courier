@@ -9,6 +9,14 @@
 		reverse_proxy api:4000
 	}
 
+	handle /docs* {
+		reverse_proxy api:4000
+	}
+
+	handle /openapi.json {
+		reverse_proxy api:4000
+	}
+
 	handle {
 		root * /srv
 		try_files {path} /index.html
