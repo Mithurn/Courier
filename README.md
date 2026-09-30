@@ -75,7 +75,7 @@ Requires Docker and Node 20+. Starts backing services (MySQL, Redis, Elasticsear
 
 Service URLs:
 * Frontend: `http://localhost:5173`
-* Bull Board: `http://localhost:4000/admin/queues` (credentials: `admin` / `515c3f87f16c058e281a53b8`)
+* Bull Board: `http://localhost:4000/admin/queues` (credentials: `BULLBOARD_USER` / `BULLBOARD_PASSWORD` from your `.env`)
 * API Docs: `http://localhost:4000/docs`
 * Health Check: `http://localhost:4000/health`
 
