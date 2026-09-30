@@ -52,11 +52,6 @@ function ToolbarButton({ onClick, label, children }: { onClick: () => void; labe
   );
 }
 
-/**
- * Icon + chevron trigger that opens a small option menu — matches the Figma "Formatting Options" /
- * alignment controls. Renders the panel through a portal (like AccountMenu) since the toolbar row
- * scrolls horizontally on mobile, and a plain absolute child would get clipped by that overflow.
- */
 function ToolbarDropdown<T extends string>({
   label,
   trigger,

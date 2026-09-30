@@ -1,15 +1,14 @@
 # Courier
 
-Courier is a production-grade email scheduling service and dashboard built with TypeScript, Express 5, BullMQ, Redis, MySQL, and Elasticsearch. It schedules emails at exact timestamps using delayed queue jobs without cron, guarantees persistence across server crashes and worker restarts, and enforces configurable per-sender hourly rate limits with in-order deferral.
+Email scheduler service and dashboard built with TypeScript, Express 5, BullMQ, Redis, MySQL, and Elasticsearch. It schedules emails at exact timestamps using BullMQ delayed jobs (no cron), persists jobs across worker and server restarts, and enforces configurable per-sender hourly rate limits with in-order deferral.
 
-Live Production URL: https://mithurnscourier.duckdns.org
+- **Live Production URL:** https://mithurnscourier.duckdns.org
+- **API Documentation (Swagger UI):** https://mithurnscourier.duckdns.org/docs
 
-## Modular Documentation
+## Documentation
 
-Detailed technical documentation is separated by responsibility:
-
-* [Backend Documentation](backend/README.md): Architecture, BullMQ worker mechanics, rate-limit algorithms, database schema, API reference, and test suite.
-* [Frontend Documentation](frontend/README.md): React components, Figma design tokens, state management, background polling, and real-time toast notifications.
+- [Backend Service](backend/README.md): Architecture, BullMQ worker mechanics, rate-limit algorithms, database schema, API reference, and test suite.
+- [Frontend Application](frontend/README.md): React components, Figma design tokens, state management, background polling, and real-time toast notifications.
 
 ---
 

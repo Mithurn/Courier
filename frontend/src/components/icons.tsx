@@ -1,6 +1,5 @@
 type IconProps = { className?: string };
 
-/** Renders Carbon Design System glyphs (32x32 viewBox, filled paths) — used for the message toolbar icon set. */
 function CarbonIcon({ paths, className = '' }: IconProps & { paths: string[] }) {
   return (
     <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor" className={className} aria-hidden="true">
