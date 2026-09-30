@@ -18,6 +18,7 @@ export const scheduleEmailSchema = z.object({
   startAt: z.coerce
     .date()
     .refine((d) => d.getTime() - Date.now() < MAX_START_AHEAD_MS, 'startAt must be within a year')
+    .refine((d) => d.getTime() > Date.now() - 10_000, 'startAt must be in the future')
     .optional(),
   delayBetweenSendsMs: z.coerce
     .number()
