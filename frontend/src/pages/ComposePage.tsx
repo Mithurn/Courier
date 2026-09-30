@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { SendLaterPopover } from '../components/SendLaterPopover';
 import { Button, ErrorBanner, Spinner } from '../components/ui';
-import { AttachmentIcon, BackIcon, ChevronDownIcon, ClockIcon, UploadIcon } from '../components/icons';
+import { AttachmentIcon, BackIcon, ChevronDownIcon, ClockIcon, DownloadIcon, UploadIcon } from '../components/icons';
 import { MessageEditor } from '../components/MessageEditor';
 import { fileToDataUrl, prepareImageAttachment } from '../lib/imageAttachments';
 import { formatFileSize } from '../lib/format';
@@ -95,6 +95,16 @@ export function ComposePage() {
     } else if (event.key === 'Backspace' && recipientDraft === '' && recipients.length > 0) {
       setRecipients((current) => current.slice(0, -1));
     }
+  }
+
+  function downloadRecipients() {
+    const blob = new Blob([recipients.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'recipients.csv';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleListUpload(file: File | undefined) {
@@ -296,20 +306,32 @@ export function ComposePage() {
                   placeholder={recipients.length === 0 ? 'recipient@example.com' : ''}
                 />
               </div>
-              <label
-                className={`ml-auto flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap text-xs font-medium ${loadingList ? 'text-muted' : 'text-brand'}`}
-              >
-                {loadingList ? <Spinner className="h-3.5 w-3.5" /> : <UploadIcon />}
-                Upload List
-                <input
-                  ref={listInputRef}
-                  type="file"
-                  accept=".csv,.txt"
-                  disabled={loadingList}
-                  onChange={(e) => void handleListUpload(e.target.files?.[0])}
-                  className="hidden"
-                />
-              </label>
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                {recipients.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={downloadRecipients}
+                    className="flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs font-medium text-brand"
+                  >
+                    <DownloadIcon />
+                    Download
+                  </button>
+                )}
+                <label
+                  className={`flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs font-medium ${loadingList ? 'text-muted' : 'text-brand'}`}
+                >
+                  {loadingList ? <Spinner className="h-3.5 w-3.5" /> : <UploadIcon />}
+                  Upload List
+                  <input
+                    ref={listInputRef}
+                    type="file"
+                    accept=".csv,.txt"
+                    disabled={loadingList}
+                    onChange={(e) => void handleListUpload(e.target.files?.[0])}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
           </FieldRow>
 
