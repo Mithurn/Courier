@@ -40,14 +40,12 @@ export function LoginPage() {
               type="email"
               placeholder="Email ID"
               disabled
-              title="This build only supports Google login"
               className="h-14 w-full rounded-[10px] bg-surface px-2 text-sm text-muted placeholder:text-muted disabled:cursor-not-allowed"
             />
             <input
               type="password"
               placeholder="Password"
               disabled
-              title="This build only supports Google login"
               className="h-14 w-full rounded-[10px] bg-surface px-2 text-sm text-muted placeholder:text-muted disabled:cursor-not-allowed"
             />
           </div>
@@ -55,7 +53,6 @@ export function LoginPage() {
           <button
             type="button"
             disabled
-            title="This build only supports Google login"
             className="h-12 w-full rounded-xl bg-brand text-base font-normal tracking-[-0.3px] text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             Login
