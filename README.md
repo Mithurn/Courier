@@ -4,7 +4,6 @@ Email scheduler service and dashboard built with TypeScript, Express 5, BullMQ, 
 
 - **Live Production URL:** https://mithurnscourier.duckdns.org
 - **API Documentation (Swagger UI):** https://mithurnscourier.duckdns.org/docs
-- **Queue Dashboard (Bull Board):** https://mithurnscourier.duckdns.org/admin/queues
 
 ---
 
