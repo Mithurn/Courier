@@ -39,7 +39,7 @@ function MenuPanel({
   return (
     <div
       style={style}
-      className="fixed z-50 min-w-[240px] rounded-lg border border-border bg-white p-1 text-sm shadow-sm"
+      className="fixed z-50 min-w-60 rounded-lg border border-border bg-white p-1 text-sm shadow-sm"
     >
       <div className="border-b border-divider px-3 py-2.5">
         <p className="truncate font-medium text-ink">{user.name}</p>

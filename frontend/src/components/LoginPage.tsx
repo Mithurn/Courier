@@ -14,8 +14,8 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white p-4">
-      <div className="flex w-full max-w-[496px] flex-col items-center justify-center rounded-[10px] border border-border px-6 py-10 sm:h-123.5 sm:px-0 sm:py-0">
-        <div className="flex w-full max-w-[380px] flex-col gap-7">
+      <div className="flex w-full max-w-124 flex-col items-center justify-center rounded-[10px] border border-border px-6 py-10 sm:h-123.5 sm:px-0 sm:py-0">
+        <div className="flex w-full max-w-95 flex-col gap-7">
           <h1 className="text-center text-3xl font-semibold leading-none text-ink sm:text-[38px]">Login</h1>
 
           {failed && <p className="text-center text-sm text-red-600">Google login failed, please try again.</p>}
@@ -23,7 +23,7 @@ export function LoginPage() {
           <div className="flex w-full flex-col gap-6">
             <a
               href="/api/auth/google"
-              className="flex h-[54px] items-center justify-center gap-3 rounded-[10px] bg-brand-soft text-sm font-medium text-ink"
+              className="flex h-13.5 items-center justify-center gap-3 rounded-[10px] bg-brand-soft text-sm font-medium text-ink"
             >
               <GoogleIcon />
               Login with Google
