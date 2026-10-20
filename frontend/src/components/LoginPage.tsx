@@ -1,3 +1,6 @@
+import { liveAppUrl } from '../config';
+import { enterDemo } from '../demo/mode';
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -22,7 +25,7 @@ export function LoginPage() {
 
           <div className="flex w-full flex-col gap-6">
             <a
-              href="/api/auth/google"
+              href={liveAppUrl('/api/auth/google')}
               className="flex h-13.5 items-center justify-center gap-3 rounded-[10px] bg-brand-soft text-sm font-medium text-ink"
             >
               <GoogleIcon />
@@ -56,6 +59,10 @@ export function LoginPage() {
             className="h-12 w-full rounded-xl bg-brand text-base font-normal tracking-[-0.3px] text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             Login
+          </button>
+
+          <button type="button" onClick={enterDemo} className="cursor-pointer text-center text-sm font-medium text-brand hover:underline">
+            Or try the demo without signing in
           </button>
         </div>
       </div>
