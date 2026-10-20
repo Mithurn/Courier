@@ -1,7 +1,9 @@
 import { request } from './client';
+import { demoApi } from '../demo/api';
+import { isDemo } from '../demo/mode';
 import type { Counts, EmailDetail, EmailLabel, EmailListItem, Page, ScheduleInput, ScheduleResult, Sender, User } from '../types';
 
-export const api = {
+const liveApi = {
   me: () => request<User>('/auth/me'),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),
   slackStatus: () => request<{ connected: boolean; teamName: string | null }>('/auth/slack/status'),
@@ -29,3 +31,5 @@ export const api = {
       body: JSON.stringify(input),
     }),
 };
+
+export const api: typeof liveApi = isDemo() ? (demoApi as typeof liveApi) : liveApi;
