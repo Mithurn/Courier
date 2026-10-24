@@ -58,6 +58,8 @@ jobs:
 
       - run: npx prisma generate
 
+      - run: npm run lint
+
       - name: Typecheck (src and tests)
         run: npm run typecheck
 
