@@ -195,11 +195,23 @@ Courier uses Ethereal Email (`https://ethereal.email`) for SMTP testing.
 cd backend
 npm test          # Runs 26 integration tests against live MySQL, Redis, ES, and SMTP
 npm run typecheck # Strict TypeScript compilation check
+npm run lint      # ESLint (also available in frontend/)
 ```
+
+Tests that only need Redis (`unit`, `auth-unit`, `redis-limits`) can be run on their own with `node --import tsx --import ./test/env.ts --test test/<name>.test.ts`; the API and scheduler suites also need MySQL and Elasticsearch (`docker compose up -d`).
 
 Automated pipelines run via GitHub Actions:
 * **Backend CI (`.github/workflows/backend-ci.yml`):** Runs tests against service containers, builds production Docker images, and pushes to GitHub Container Registry (GHCR).
 * **Frontend CI/CD (`.github/workflows/frontend-deploy.yml`):** Runs TypeScript compilation, bundles production assets with Vite, and deploys to the AWS EC2 production instance.
+
+---
+
+## Contributing
+
+1. Branch from `main`.
+2. Add tests with your change (backend tests live in `backend/test/`).
+3. Make sure `npm run lint`, `npm run typecheck`, `npm run build` and `npm test` pass in `backend/`, and `npm run lint` and `npm run build` in `frontend/`. CI runs the same checks.
+4. Open a pull request. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together.
 
 ---
 
