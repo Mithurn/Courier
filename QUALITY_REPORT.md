@@ -15,7 +15,7 @@ MySQL and Elasticsearch are not available in this environment, so the API and sc
 | Frontend lint | none configured | ESLint: clean |
 | Backend typecheck / build | clean | clean |
 | Frontend build | passes | passes |
-| `npm audit` (backend) | 9 vulns (5 high, 4 moderate) | 7 (6 high, 1 moderate) |
+| `npm audit` (backend) | 9 vulns (6 high, 3 moderate) | 7 (6 high, 1 moderate) |
 | `npm audit` (frontend) | 3 (1 critical, 2 high) | 0 |
 
 ## Changes by phase
