@@ -2,6 +2,7 @@ import logo from '../assets/logo.webp';
 import { liveAppUrl } from '../config';
 import { enterDemo } from '../demo/mode';
 import { FEATURES, SHOTS, STACK, STEPS } from './content';
+import { ProductVideo } from './ProductVideo';
 
 const primaryButton =
   'inline-flex h-12 items-center justify-center rounded-full bg-brand px-7 text-sm font-medium text-white transition hover:opacity-90';
@@ -61,6 +62,14 @@ export function Landing() {
           <p className="mt-4 text-xs text-muted">The demo runs in your browser with sample data. No sign-in needed.</p>
           <div className="mx-auto mt-14 max-w-5xl">
             <BrowserFrame src={SHOTS[0].src} alt={SHOTS[0].alt} />
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-6 pb-20">
+          <h2 className="text-center text-3xl font-semibold tracking-tight">See it schedule, in 36 seconds</h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-muted">From a queue with live countdowns to rate limits that never drop a send.</p>
+          <div className="mt-10">
+            <ProductVideo />
           </div>
         </section>
 
